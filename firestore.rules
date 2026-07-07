@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// La app no tiene login (ver README): cualquiera con la URL y la config de Firebase
+// puede leer/escribir. Por eso el acceso se limita a un único documento fijo,
+// en vez de abrir toda la base de datos. Aceptable para un proyecto familiar
+// de un solo hogar, pero es una limitación de seguridad conocida (ver README).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /families/default {
+      allow read, write: if true;
+    }
+  }
+}

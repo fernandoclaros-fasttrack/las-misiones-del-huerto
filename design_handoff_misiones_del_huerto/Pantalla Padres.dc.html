@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body { background: #E9E0CC; }
+  button { font-family: inherit; }
+  input, select { font-family: inherit; }
+  a { color: #5B8C3E; text-decoration: none; }
+  a:hover { color: #3F6B26; }
+  ::-webkit-scrollbar { height: 0; width: 0; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#E9E0CC;font-family:'Nunito',system-ui,sans-serif;color:#3A3228;display:flex;justify-content:center;">
+  <div style="width:100%;max-width:520px;display:flex;flex-direction:column;min-height:100vh;">
+
+    <header style="background:{{ accent }};color:#F6F1E2;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px;font-family:'Bitter',serif;font-weight:700;font-size:16px;">🌿 Panel de gestión</div>
+        <div style="font-size:12.5px;opacity:.82;margin-top:2px;font-weight:600;">Las misiones del huerto · vista de padres</div>
+      </div>
+    </header>
+
+    <div style="padding:16px 16px 8px;">
+      <div style="background:#3B3226;color:#F5EFE0;border-radius:18px;padding:16px 18px;box-shadow:0 6px 16px rgba(58,50,40,.18);">
+        <div style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px;">
+          <div>
+            <div style="font-size:12.5px;letter-spacing:.4px;text-transform:uppercase;opacity:.7;font-weight:800;">Puntos acumulados</div>
+            <div style="font-family:'Bitter',serif;font-weight:700;font-size:44px;line-height:1;margin-top:4px;">{{ acumulado }}</div>
+          </div>
+          <div style="font-size:12px;opacity:.6;text-align:right;line-height:1.4;">acumulados =<br>ganados − canjeados</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px;">
+          <button onClick="{{ openEdit }}" style="{{ btnEdit }}">✏️ Editar</button>
+          <button onClick="{{ openPenalty }}" style="{{ btnPenalty }}">➖ Penalizar</button>
+          <button onClick="{{ openRedeem }}" style="{{ btnRedeem }}">🎁 Canjear</button>
+          <button onClick="{{ openReset }}" style="{{ btnReset }}">↺ Resetear</button>
+        </div>
+
+        <sc-if value="{{ panelEdit }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;background:#4A4032;border-radius:12px;padding:12px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Fijar puntos acumulados</div>
+            <div style="display:flex;gap:8px;">
+              <input type="number" value="{{ editVal }}" onChange="{{ onEditVal }}" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:none;font-size:16px;font-weight:800;color:#3A3228;" />
+              <button onClick="{{ saveEdit }}" style="{{ btnGo }}">Guardar</button>
+              <button onClick="{{ closePanel }}" style="{{ btnGhost }}">Cancelar</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ panelPenalty }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;background:#4A4032;border-radius:12px;padding:12px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:8px;">Restar puntos (penalización)</div>
+            <div style="display:flex;gap:8px;">
+              <input type="number" value="{{ penaltyVal }}" onChange="{{ onPenaltyVal }}" placeholder="p. ej. 15" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:none;font-size:16px;font-weight:800;color:#3A3228;" />
+              <button onClick="{{ applyPenalty }}" style="{{ btnGo }}">Aplicar</button>
+              <button onClick="{{ closePanel }}" style="{{ btnGhost }}">Cancelar</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ panelReset }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;background:#4A4032;border-radius:12px;padding:12px;">
+            <div style="font-size:13px;font-weight:700;margin-bottom:10px;">¿Poner el contador a cero?</div>
+            <div style="display:flex;gap:8px;">
+              <button onClick="{{ doReset }}" style="{{ btnDanger }}">Sí, resetear a 0</button>
+              <button onClick="{{ closePanel }}" style="{{ btnGhost }}">Cancelar</button>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ panelRedeem }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:14px;background:#4A4032;border-radius:12px;padding:12px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+              <span style="font-size:13px;font-weight:700;">Canjear por una recompensa</span>
+              <button onClick="{{ toggleConceptForm }}" style="{{ btnMini }}">+ concepto</button>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:7px;">
+              <sc-for list="{{ concepts }}" as="c" hint-placeholder-count="4">
+                <button onClick="{{ c.onSelect }}" style="{{ c.style }}">
+                  <span>{{ c.emoji }}</span>
+                  <span style="margin-left:5px;font-weight:800;font-size:13px;">{{ c.label }}</span>
+                  <span onClick="{{ c.onRemove }}" style="margin-left:7px;opacity:.55;font-weight:900;">×</span>
+                </button>
+              </sc-for>
+            </div>
+
+            <sc-if value="{{ showConceptForm }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:10px;background:#3B3226;border-radius:10px;padding:10px;">
+                <input value="{{ newConceptLabel }}" onChange="{{ onNewConceptLabel }}" placeholder="Nombre (p. ej. Cine)" style="width:100%;padding:9px 11px;border-radius:9px;border:none;font-size:14px;font-weight:700;color:#3A3228;" />
+                <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;">
+                  <sc-for list="{{ conceptPalette }}" as="p" hint-placeholder-count="10">
+                    <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.emoji }}</button>
+                  </sc-for>
+                </div>
+                <button onClick="{{ addConcept }}" style="{{ btnGo }} margin-top:9px;width:100%;">Añadir concepto</button>
+              </div>
+            </sc-if>
+
+            <div style="display:flex;gap:8px;margin-top:12px;align-items:center;">
+              <input type="number" value="{{ redeemVal }}" onChange="{{ onRedeemVal }}" placeholder="puntos" style="flex:1;min-width:0;padding:10px 12px;border-radius:10px;border:none;font-size:16px;font-weight:800;color:#3A3228;" />
+              <button onClick="{{ confirmRedeem }}" style="{{ btnConfirm }}">Confirmar canje</button>
+            </div>
+            <div style="margin-top:9px;font-size:13px;{{ redeemMsgStyle }}">{{ redeemMsg }}</div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+
+    <nav style="display:flex;gap:8px;overflow-x:auto;padding:8px 16px 6px;flex:0 0 auto;">
+      <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="7">
+        <button onClick="{{ t.onClick }}" style="{{ t.style }}">
+          <span>{{ t.short }}</span>
+          <sc-if value="{{ t.isToday }}" hint-placeholder-val="{{ false }}">
+            <span style="display:block;width:5px;height:5px;border-radius:50%;background:{{ t.dotColor }};margin:4px auto 0;"></span>
+          </sc-if>
+        </button>
+      </sc-for>
+    </nav>
+
+    <main style="flex:1;padding:6px 16px 40px;display:flex;flex-direction:column;gap:11px;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding:4px 4px 2px;">
+        <span style="font-family:'Bitter',serif;font-weight:600;font-size:18px;">{{ dayLabel }}</span>
+        <span style="font-size:13px;color:#8A7E6B;font-weight:700;">{{ totalCount }} misiones</span>
+      </div>
+
+      <sc-for list="{{ missions }}" as="m" hint-placeholder-count="6">
+        <div style="{{ m.cardStyle }}">
+          <sc-if value="{{ m.editing }}" hint-placeholder-val="{{ false }}">
+            <div>
+              <div style="font-size:13px;font-weight:800;color:#7C6E52;margin-bottom:8px;">Editar misión</div>
+              <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">
+                <sc-for list="{{ missionPalette }}" as="p" hint-placeholder-count="12">
+                  <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.emoji }}</button>
+                </sc-for>
+              </div>
+              <input value="{{ draftTitle }}" onChange="{{ onDraftTitle }}" placeholder="Título de la misión" style="{{ inputStyle }}" />
+              <div style="display:flex;gap:8px;margin-top:9px;align-items:center;">
+                <label style="font-size:13px;font-weight:700;color:#7C6E52;">Puntos</label>
+                <input type="number" value="{{ draftPoints }}" onChange="{{ onDraftPoints }}" style="width:84px;padding:9px 11px;border-radius:10px;border:1px solid #E0D6C2;font-size:15px;font-weight:800;" />
+              </div>
+              <div style="display:flex;gap:8px;margin-top:12px;">
+                <button onClick="{{ saveMission }}" style="{{ btnSave }}">Guardar</button>
+                <button onClick="{{ cancelEdit }}" style="{{ btnCancel }}">Cancelar</button>
+              </div>
+            </div>
+          </sc-if>
+          <sc-if value="{{ m.viewing }}" hint-placeholder-val="{{ true }}">
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <div style="{{ m.tileStyle }}">{{ m.emoji }}</div>
+                <div style="flex:1;min-width:0;">
+                  <div style="font-weight:700;font-size:16px;line-height:1.2;">{{ m.title }}</div>
+                  <div style="font-size:12.5px;color:#8A7E6B;font-weight:700;margin-top:2px;">{{ m.points }} pts</div>
+                </div>
+                <button onClick="{{ m.onEdit }}" title="Editar" style="{{ iconBtn }}">✏️</button>
+                <button onClick="{{ m.onDelete }}" title="Borrar" style="{{ iconBtn }}">🗑️</button>
+              </div>
+              <div style="margin-top:11px;">
+                <select value="{{ m.status }}" onChange="{{ m.onStatus }}" style="{{ m.selectStyle }}">
+                  <option value="pendiente">🌰 Pendiente</option>
+                  <option value="progreso">🌱 En progreso</option>
+                  <option value="bloqueada">🥀 Bloqueada</option>
+                  <option value="completada">🌻 Completada</option>
+                </select>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+
+      <sc-if value="{{ addingNew }}" hint-placeholder-val="{{ false }}">
+        <div style="background:#FBF7EC;border:2px dashed #C9BE9F;border-radius:18px;padding:15px 16px;">
+          <div style="font-size:13px;font-weight:800;color:#7C6E52;margin-bottom:8px;">Nueva misión</div>
+          <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:12px;">
+            <sc-for list="{{ missionPalette }}" as="p" hint-placeholder-count="12">
+              <button onClick="{{ p.onClick }}" style="{{ p.style }}">{{ p.emoji }}</button>
+            </sc-for>
+          </div>
+          <div style="font-size:12.5px;font-weight:800;color:#7C6E52;margin-bottom:6px;">¿Qué día o días aparece?</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;">
+            <sc-for list="{{ dayChips }}" as="d" hint-placeholder-count="7">
+              <button onClick="{{ d.onClick }}" style="{{ d.style }}">{{ d.short }}</button>
+            </sc-for>
+          </div>
+          <input value="{{ draftTitle }}" onChange="{{ onDraftTitle }}" placeholder="Título de la misión" style="{{ inputStyle }}" />
+          <div style="display:flex;gap:8px;margin-top:9px;align-items:center;">
+            <label style="font-size:13px;font-weight:700;color:#7C6E52;">Puntos</label>
+            <input type="number" value="{{ draftPoints }}" onChange="{{ onDraftPoints }}" style="width:84px;padding:9px 11px;border-radius:10px;border:1px solid #E0D6C2;font-size:15px;font-weight:800;" />
+          </div>
+          <div style="display:flex;gap:8px;margin-top:12px;">
+            <button onClick="{{ saveMission }}" style="{{ btnSave }}">Añadir misión</button>
+            <button onClick="{{ cancelEdit }}" style="{{ btnCancel }}">Cancelar</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ showAddButton }}" hint-placeholder-val="{{ true }}">
+        <button onClick="{{ openAdd }}" style="width:100%;padding:14px;border-radius:16px;border:2px dashed #C4B896;background:transparent;color:#6E6045;font-weight:800;font-size:15px;cursor:pointer;">＋ Añadir misión</button>
+      </sc-if>
+    </main>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:460,&quot;height&quot;:1000},&quot;basePoints&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:40,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Datos&quot;,&quot;min&quot;:0,&quot;max&quot;:999,&quot;unit&quot;:&quot;pts&quot;},&quot;accent&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#5B8C3E&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Estilo&quot;,&quot;options&quot;:[&quot;#47702F&quot;,&quot;#5B8C3E&quot;,&quot;#3E6B57&quot;,&quot;#B4633A&quot;]}}">
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.META = {
+      pendiente:  { label: "Pendiente",   icon: "🌰", bg: "#ECE3D0", ring: "#C6B592", fg: "#7C6E52" },
+      progreso:   { label: "En progreso", icon: "🌱", bg: "#F6E9C4", ring: "#DBA92C", fg: "#957414" },
+      bloqueada:  { label: "Bloqueada",   icon: "🥀", bg: "#F1DACF", ring: "#C4664A", fg: "#A04A32" },
+      completada: { label: "Completada",  icon: "🌻", bg: "#DDEBC9", ring: "#5B8C3E", fg: "#3F6B26" },
+    };
+    this.PALETTE = ["🛏️","🍽️","🍴","🪴","🧸","🗑️","🛋️","🧹","🫧","🧺","👕","🐶","🎒","♻️","🍳","🛁","🍂","🛒","🚗","📚","🖊️","🌻"];
+    const days = this.seed();
+    this.state = {
+      days,
+      selected: this.todayIdx(),
+      acumulado: this.initialPoints(days),
+      panel: null,          // 'edit' | 'penalty' | 'reset' | 'redeem'
+      editVal: "", penaltyVal: "", redeemVal: "",
+      editingId: null,      // 'new' | mission id
+      draft: { emoji: "🌱", title: "", points: 10 },
+      concepts: [
+        { id: "c1", emoji: "🎮", label: "Consola" },
+        { id: "c2", emoji: "📺", label: "Tele" },
+        { id: "c3", emoji: "📱", label: "Tablet" },
+        { id: "c4", emoji: "🍦", label: "Postre" },
+      ],
+      redeemConcept: "c1",
+      showConceptForm: false,
+      newConceptLabel: "", newConceptEmoji: "🎯",
+      redeemMsg: "", redeemErr: false,
+      cid: 5,
+    };
+  }
+
+  todayIdx() { return (new Date().getDay() + 6) % 7; }
+
+  seed() {
+    const D = (label, short, missions) => ({ label, short, missions });
+    const m = (id, emoji, title, points, status) => ({ id, emoji, title, points, status: status || "pendiente" });
+    return [
+      D("Lunes", "Lun", [
+        m("lun1", "🛏️", "Hacer la cama", 10),
+        m("lun2", "🍴", "Poner la mesa", 10),
+        m("lun3", "🪴", "Regar las plantas del huerto", 10, "progreso"),
+        m("lun4", "🧸", "Recoger los juguetes", 10),
+        m("lun5", "🗑️", "Sacar la basura", 10),
+      ]),
+      D("Martes", "Mar", [
+        m("mar1", "🍽️", "Recoger mesa del comedor", 10),
+        m("mar2", "🛏️", "Hacer las camas", 10, "completada"),
+        m("mar3", "🧸", "Recoger el cuarto", 10, "progreso"),
+        m("mar4", "🛋️", "Recoger el salón", 10),
+        m("mar5", "🧹", "Aspirar el sofá", 15),
+        m("mar6", "🧹", "Aspirar el salón", 15),
+        m("mar7", "🫧", "Gestionar el lavavajillas", 10, "completada"),
+        m("mar8", "🧺", "Recoger y doblar los trapos", 10),
+        m("mar9", "👕", "Ayudar a tender la ropa", 10, "bloqueada"),
+      ]),
+      D("Miércoles", "Mié", [
+        m("mie1", "🛏️", "Hacer la cama", 10),
+        m("mie2", "🐶", "Dar de comer a la mascota", 10),
+        m("mie3", "🎒", "Ordenar la mochila", 10),
+        m("mie4", "🫧", "Poner el lavavajillas", 10),
+        m("mie5", "🧹", "Barrer la cocina", 10),
+      ]),
+      D("Jueves", "Jue", [
+        m("jue1", "🛏️", "Hacer la cama", 10),
+        m("jue2", "🪴", "Regar el huerto", 10),
+        m("jue3", "🧸", "Recoger el cuarto", 10),
+        m("jue4", "🍳", "Ayudar con la cena", 10),
+        m("jue5", "♻️", "Sacar el reciclaje", 10),
+      ]),
+      D("Viernes", "Vie", [
+        m("vie1", "🛏️", "Hacer la cama", 10),
+        m("vie2", "🛋️", "Recoger el salón", 10),
+        m("vie3", "🖊️", "Limpiar tu escritorio", 10),
+        m("vie4", "👕", "Doblar tu ropa", 10),
+        m("vie5", "🍴", "Poner la mesa", 10),
+      ]),
+      D("Sábado", "Sáb", [
+        m("sab1", "🛏️", "Cambiar las sábanas", 15),
+        m("sab2", "🛁", "Limpiar el baño", 15),
+        m("sab3", "🍂", "Recoger el jardín", 10),
+        m("sab4", "🛒", "Ayudar con la compra", 10),
+        m("sab5", "🚗", "Lavar el coche", 20),
+      ]),
+      D("Domingo", "Dom", [
+        m("dom1", "🎒", "Preparar la mochila del lunes", 10),
+        m("dom2", "🪴", "Regar las plantas", 10),
+        m("dom3", "📚", "Ordenar los libros", 10),
+        m("dom4", "🍳", "Ayudar a cocinar", 10),
+      ]),
+    ];
+  }
+
+  base() { const b = this.props.basePoints; return (b === undefined || b === null) ? 40 : b; }
+  initialPoints(days) {
+    let s = this.base();
+    days.forEach(d => d.missions.forEach(mi => { if (mi.status === "completada") s += mi.points; }));
+    return s;
+  }
+
+  selectDay(i) { this.setState({ selected: i, editingId: null }); }
+
+  setStatus(dayIdx, id, key) {
+    let delta = 0;
+    const days = this.state.days.map((d, di) => {
+      if (di !== dayIdx) return d;
+      return { ...d, missions: d.missions.map(mi => {
+        if (mi.id !== id || mi.status === key) return mi;
+        const was = mi.status === "completada", now = key === "completada";
+        if (was && !now) delta -= mi.points;
+        if (!was && now) delta += mi.points;
+        return { ...mi, status: key };
+      }) };
+    });
+    this.setState({ days, acumulado: this.state.acumulado + delta });
+  }
+
+  // ----- mission add/edit -----
+  openAdd() { this.setState({ editingId: "new", draft: { emoji: "🌱", title: "", points: 10, days: [this.state.selected] } }); }
+  openEditMission(dayIdx, mi) { this.setState({ editingId: mi.id, draft: { emoji: mi.emoji, title: mi.title, points: mi.points, days: [dayIdx] } }); }
+  cancelEdit() { this.setState({ editingId: null }); }
+  setDraft(patch) { this.setState({ draft: { ...this.state.draft, ...patch } }); }
+  toggleDraftDay(i) { const cur = this.state.draft.days || []; const days = cur.includes(i) ? cur.filter(x => x !== i) : [...cur, i]; this.setDraft({ days }); }
+
+  saveMission() {
+    const sel = this.state.selected;
+    const d = this.state.draft;
+    const title = (d.title || "").trim();
+    if (!title) return;
+    const pts = Math.max(0, parseInt(d.points, 10) || 0);
+    if (this.state.editingId === "new") {
+      const targets = (d.days && d.days.length) ? d.days : [sel];
+      const stamp = Date.now();
+      const days = this.state.days.map((day, di) => !targets.includes(di) ? day
+        : { ...day, missions: [...day.missions, { id: "m" + stamp + "-" + di, emoji: d.emoji, title, points: pts, status: "pendiente" }] });
+      this.setState({ days, editingId: null });
+    } else {
+      const id = this.state.editingId;
+      let delta = 0;
+      const days = this.state.days.map((day, di) => di !== sel ? day
+        : { ...day, missions: day.missions.map(mi => {
+            if (mi.id !== id) return mi;
+            if (mi.status === "completada") delta += (pts - mi.points);
+            return { ...mi, emoji: d.emoji, title, points: pts };
+          }) });
+      this.setState({ days, editingId: null, acumulado: this.state.acumulado + delta });
+    }
+  }
+
+  deleteMission(dayIdx, mi) {
+    const days = this.state.days.map((day, di) => di !== dayIdx ? day
+      : { ...day, missions: day.missions.filter(x => x.id !== mi.id) });
+    const delta = mi.status === "completada" ? -mi.points : 0;
+    this.setState({ days, acumulado: this.state.acumulado + delta, editingId: this.state.editingId === mi.id ? null : this.state.editingId });
+  }
+
+  // ----- points panels -----
+  openPanel(name) {
+    const patch = { panel: this.state.panel === name ? null : name, redeemMsg: "" };
+    if (name === "edit") patch.editVal = String(this.state.acumulado);
+    if (name === "penalty") patch.penaltyVal = "";
+    if (name === "redeem") patch.redeemVal = "";
+    this.setState(patch);
+  }
+  closePanel() { this.setState({ panel: null, showConceptForm: false }); }
+  saveEdit() { const v = parseInt(this.state.editVal, 10) || 0; this.setState({ acumulado: v, panel: null }); }
+  applyPenalty() { const v = Math.max(0, parseInt(this.state.penaltyVal, 10) || 0); this.setState({ acumulado: this.state.acumulado - v, panel: null }); }
+  doReset() { this.setState({ acumulado: 0, panel: null }); }
+
+  // ----- redeem -----
+  selectConcept(id) { this.setState({ redeemConcept: id }); }
+  removeConcept(id, e) { if (e && e.stopPropagation) e.stopPropagation(); const concepts = this.state.concepts.filter(c => c.id !== id); this.setState({ concepts, redeemConcept: this.state.redeemConcept === id ? (concepts[0] && concepts[0].id) : this.state.redeemConcept }); }
+  toggleConceptForm() { this.setState({ showConceptForm: !this.state.showConceptForm, newConceptLabel: "", newConceptEmoji: "🎯" }); }
+  addConcept() {
+    const label = (this.state.newConceptLabel || "").trim();
+    if (!label) return;
+    const id = "uc" + this.state.cid;
+    this.setState({ concepts: [...this.state.concepts, { id, emoji: this.state.newConceptEmoji, label }], cid: this.state.cid + 1, showConceptForm: false, redeemConcept: id });
+  }
+  confirmRedeem() {
+    const pts = parseInt(this.state.redeemVal, 10) || 0;
+    if (pts <= 0) { this.setState({ redeemMsg: "Introduce cuántos puntos canjear.", redeemErr: true }); return; }
+    if (pts > this.state.acumulado) { this.setState({ redeemMsg: "No hay suficientes puntos acumulados.", redeemErr: true }); return; }
+    const c = this.state.concepts.find(x => x.id === this.state.redeemConcept);
+    this.setState({ acumulado: this.state.acumulado - pts, redeemVal: "", redeemMsg: "Canjeados " + pts + " pts" + (c ? " por " + c.label + " " + c.emoji : "") + ".", redeemErr: false });
+  }
+
+  renderVals() {
+    const accent = this.props.accent || "#47702F";
+    const sel = this.state.selected;
+    const S = this.state;
+
+    const tabs = S.days.map((d, i) => {
+      const on = i === sel, isToday = i === this.todayIdx();
+      const style = on
+        ? `flex:0 0 auto;min-width:54px;padding:9px 12px;border-radius:14px;border:none;cursor:pointer;font-weight:800;font-size:14px;background:${accent};color:#F6F1E2;box-shadow:0 4px 10px rgba(58,50,40,.16);`
+        : `flex:0 0 auto;min-width:54px;padding:9px 12px;border-radius:14px;border:1px solid #DCD1B9;cursor:pointer;font-weight:800;font-size:14px;background:#FBF7EC;color:#8A7C60;`;
+      return { short: d.short, style, isToday, dotColor: on ? "#F6F1E2" : accent, onClick: () => this.selectDay(i) };
+    });
+
+    const day = S.days[sel];
+    const missions = (day ? day.missions : []).map(mi => {
+      const meta = this.META[mi.status];
+      const editing = S.editingId === mi.id;
+      const tileStyle = "flex:0 0 auto;width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:25px;background:#F1ECDD;";
+      const selectStyle = `width:100%;padding:9px 12px;border-radius:11px;border:1.5px solid ${meta.ring};background:${meta.bg};color:${meta.fg};font-weight:800;font-size:14px;cursor:pointer;-webkit-appearance:menulist;`;
+      return {
+        id: mi.id, emoji: mi.emoji, title: mi.title, points: mi.points, status: mi.status,
+        editing, viewing: !editing, tileStyle, selectStyle,
+        cardStyle: "background:#FFFDF6;border:1px solid #EADFCB;border-radius:18px;padding:14px 15px;box-shadow:0 2px 5px rgba(58,50,40,.05);",
+        onStatus: (e) => this.setStatus(sel, mi.id, e.target.value),
+        onEdit: () => this.openEditMission(sel, mi),
+        onDelete: () => this.deleteMission(sel, mi),
+      };
+    });
+
+    const paletteFor = (selEmoji, pick) => this.PALETTE.map(em => {
+      const active = em === selEmoji;
+      const style = active
+        ? "width:40px;height:40px;border-radius:11px;border:2px solid #5B8C3E;background:#DDEBC9;font-size:21px;cursor:pointer;display:flex;align-items:center;justify-content:center;"
+        : "width:40px;height:40px;border-radius:11px;border:1px solid #E4DBC8;background:#FFFDF6;font-size:21px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:.85;";
+      return { emoji: em, style, onClick: () => pick(em) };
+    });
+
+    const concepts = S.concepts.map(c => {
+      const active = c.id === S.redeemConcept;
+      const style = active
+        ? "display:flex;align-items:center;padding:8px 11px;border-radius:11px;border:2px solid #7FB25C;background:#3B3226;color:#EFE7CF;cursor:pointer;"
+        : "display:flex;align-items:center;padding:8px 11px;border-radius:11px;border:1px solid #6A5E48;background:#5A4E3C;color:#D8CDB4;cursor:pointer;";
+      return { emoji: c.emoji, label: c.label, style, onSelect: () => this.selectConcept(c.id), onRemove: (e) => this.removeConcept(c.id, e) };
+    });
+
+    const btn = (bg, fg, extra) => `display:flex;align-items:center;justify-content:center;gap:5px;padding:11px 8px;border-radius:12px;border:none;cursor:pointer;font-weight:800;font-size:13.5px;background:${bg};color:${fg};${extra || ""}`;
+
+    const dayChips = S.days.map((d, i) => {
+      const on = (S.draft.days || []).includes(i);
+      const style = on
+        ? `padding:8px 12px;border-radius:11px;border:none;cursor:pointer;font-weight:800;font-size:13px;background:${accent};color:#F6F1E2;`
+        : "padding:8px 12px;border-radius:11px;border:1px solid #D6CBB2;cursor:pointer;font-weight:800;font-size:13px;background:#fff;color:#8A7C60;";
+      return { short: d.short, style, onClick: () => this.toggleDraftDay(i) };
+    });
+
+    return {
+      accent,
+      acumulado: S.acumulado,
+      tabs,
+      dayLabel: day ? day.label : "",
+      totalCount: missions.length,
+      missions,
+
+      addingNew: S.editingId === "new",
+      showAddButton: S.editingId !== "new",
+      openAdd: () => this.openAdd(),
+      dayChips,
+      cancelEdit: () => this.cancelEdit(),
+      saveMission: () => this.saveMission(),
+      draftTitle: S.draft.title,
+      draftPoints: S.draft.points,
+      onDraftTitle: (e) => this.setDraft({ title: e.target.value }),
+      onDraftPoints: (e) => this.setDraft({ points: e.target.value }),
+      missionPalette: paletteFor(S.draft.emoji, (em) => this.setDraft({ emoji: em })),
+      inputStyle: "width:100%;padding:11px 12px;border-radius:11px;border:1px solid #E0D6C2;font-size:15px;font-weight:700;background:#fff;",
+      iconBtn: "flex:0 0 auto;width:38px;height:38px;border-radius:10px;border:1px solid #EADFCB;background:#FBF7EC;font-size:17px;cursor:pointer;",
+      btnSave: btn("#47702F", "#F6F1E2", "flex:1;"),
+      btnCancel: btn("#EFE7D4", "#7C6E52", "flex:0 0 auto;padding-left:16px;padding-right:16px;"),
+
+      // points panels
+      panelEdit: S.panel === "edit",
+      panelPenalty: S.panel === "penalty",
+      panelReset: S.panel === "reset",
+      panelRedeem: S.panel === "redeem",
+      openEdit: () => this.openPanel("edit"),
+      openPenalty: () => this.openPanel("penalty"),
+      openReset: () => this.openPanel("reset"),
+      openRedeem: () => this.openPanel("redeem"),
+      closePanel: () => this.closePanel(),
+      btnEdit: btn("#5A4E3C", "#EFE7CF"),
+      btnPenalty: btn("#5A4E3C", "#EFE7CF"),
+      btnRedeem: btn("#7FB25C", "#22331A"),
+      btnReset: btn("#5A4E3C", "#EFE7CF"),
+      btnGo: btn("#7FB25C", "#22331A", "flex:0 0 auto;"),
+      btnGhost: btn("#5A4E3C", "#D8CDB4", "flex:0 0 auto;"),
+      btnDanger: btn("#C4664A", "#FBEFE9", "flex:1;"),
+      btnConfirm: btn("#7FB25C", "#22331A", "flex:0 0 auto;"),
+      btnMini: btn("#5A4E3C", "#D8CDB4", "padding:6px 10px;font-size:12px;"),
+      editVal: S.editVal, onEditVal: (e) => this.setState({ editVal: e.target.value }), saveEdit: () => this.saveEdit(),
+      penaltyVal: S.penaltyVal, onPenaltyVal: (e) => this.setState({ penaltyVal: e.target.value }), applyPenalty: () => this.applyPenalty(),
+      doReset: () => this.doReset(),
+
+      // redeem
+      concepts,
+      redeemVal: S.redeemVal, onRedeemVal: (e) => this.setState({ redeemVal: e.target.value, redeemMsg: "" }),
+      confirmRedeem: () => this.confirmRedeem(),
+      redeemMsg: S.redeemMsg,
+      redeemMsgStyle: S.redeemErr ? "color:#F0B49A;font-weight:700;" : "color:#BFE08A;font-weight:700;",
+      showConceptForm: S.showConceptForm,
+      toggleConceptForm: () => this.toggleConceptForm(),
+      newConceptLabel: S.newConceptLabel, onNewConceptLabel: (e) => this.setState({ newConceptLabel: e.target.value }),
+      conceptPalette: paletteFor(S.newConceptEmoji, (em) => this.setState({ newConceptEmoji: em })),
+      addConcept: () => this.addConcept(),
+    };
+  }
+}
+</script>
+</body>
+</html>
