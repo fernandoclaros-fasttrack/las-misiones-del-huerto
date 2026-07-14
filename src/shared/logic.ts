@@ -124,8 +124,16 @@ export function applyPenalty(data: FamilyData, amount: number): Pick<FamilyData,
   return { acumulado: data.acumulado - n }
 }
 
-export function resetCounter(): Pick<FamilyData, 'acumulado'> {
-  return { acumulado: 0 }
+/** Resetea la semana entera: contador compartido, puntos por hijo, y el estado de
+ *  todas las misiones (todos los días) vuelven a "pendiente". El histórico de
+ *  canjes no se toca: es un registro de eventos pasados, no del estado actual. */
+export function resetCounter(data: FamilyData): Pick<FamilyData, 'acumulado' | 'children' | 'days'> {
+  const days = data.days.map((day) => ({
+    ...day,
+    missions: day.missions.map((mi) => (mi.status === 'pendiente' ? mi : { ...mi, status: 'pendiente' as const })),
+  }))
+  const children = data.children.map((c) => (c.points === 0 ? c : { ...c, points: 0 }))
+  return { acumulado: 0, children, days }
 }
 
 export interface RedeemResult {

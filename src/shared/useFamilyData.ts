@@ -76,7 +76,7 @@ export function useFamilyData() {
 
       applyPenalty: (amount: number) => run((d) => ({ patch: logic.applyPenalty(d, amount), result: undefined })),
 
-      resetCounter: () => run(() => ({ patch: logic.resetCounter(), result: undefined })),
+      resetCounter: () => run((d) => ({ patch: logic.resetCounter(d), result: undefined })),
 
       redeemPoints: (points: number) =>
         run((d) => {
