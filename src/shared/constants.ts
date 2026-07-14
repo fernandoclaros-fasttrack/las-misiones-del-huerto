@@ -104,5 +104,6 @@ export function seedFamilyData(): FamilyData {
     acumulado,
     concepts: DEFAULT_CONCEPTS,
     days,
+    children: [],
   }
 }

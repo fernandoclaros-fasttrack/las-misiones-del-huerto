@@ -1,4 +1,4 @@
-import type { Day, FamilyData, Mission, MissionStatus, RewardConcept } from './types'
+import type { Child, Day, FamilyData, Mission, MissionStatus, RewardConcept } from './types'
 
 /**
  * Reglas de negocio puras (ver README del handoff de diseño, sección "Reglas de negocio").
@@ -7,12 +7,36 @@ import type { Day, FamilyData, Mission, MissionStatus, RewardConcept } from './t
  * (dos pantallas -hijos y padres- pueden estar abiertas a la vez).
  */
 
+/** Reparte `total` en `n` partes enteras lo más iguales posible; el resto (positivo o
+ *  negativo) se reparte de uno en uno a los primeros hijos, en orden, para no perder nada. */
+function splitAmong(total: number, n: number): number[] {
+  if (n <= 0) return []
+  const base = Math.trunc(total / n)
+  const shares = new Array(n).fill(base)
+  let remainder = total - base * n
+  const step = remainder > 0 ? 1 : -1
+  for (let i = 0; remainder !== 0; i = (i + 1) % n) {
+    shares[i] += step
+    remainder -= step
+  }
+  return shares
+}
+
+/** Aplica un delta de puntos a los hijos (repartido a partes iguales) si hay alguno
+ *  configurado; si no, cae al contador compartido heredado (comportamiento de v1 intacto). */
+function applyPointsDelta(data: FamilyData, delta: number): Pick<FamilyData, 'acumulado' | 'children'> {
+  if (data.children.length === 0) return { acumulado: data.acumulado + delta, children: data.children }
+  const shares = splitAmong(delta, data.children.length)
+  const children = data.children.map((c, i) => ({ ...c, points: c.points + shares[i] }))
+  return { acumulado: data.acumulado, children }
+}
+
 export function setMissionStatus(
   data: FamilyData,
   dayIdx: number,
   missionId: string,
   status: MissionStatus,
-): Pick<FamilyData, 'days' | 'acumulado'> {
+): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
   let delta = 0
   const days = data.days.map((day, di) => {
     if (di !== dayIdx) return day
@@ -28,7 +52,7 @@ export function setMissionStatus(
       }),
     }
   })
-  return { days, acumulado: data.acumulado + delta }
+  return { days, ...applyPointsDelta(data, delta) }
 }
 
 export interface NewMissionInput {
@@ -61,7 +85,7 @@ export function editMission(
   dayIdx: number,
   missionId: string,
   input: EditMissionInput,
-): Pick<FamilyData, 'days' | 'acumulado'> {
+): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
   const title = input.title.trim()
   const points = Math.max(0, Math.round(input.points) || 0)
   let delta = 0
@@ -76,15 +100,19 @@ export function editMission(
       }),
     }
   })
-  return { days, acumulado: data.acumulado + delta }
+  return { days, ...applyPointsDelta(data, delta) }
 }
 
-export function deleteMission(data: FamilyData, dayIdx: number, missionId: string): Pick<FamilyData, 'days' | 'acumulado'> {
+export function deleteMission(
+  data: FamilyData,
+  dayIdx: number,
+  missionId: string,
+): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
   const day = data.days[dayIdx]
   const mission = day?.missions.find((mi) => mi.id === missionId)
   const delta = mission?.status === 'completada' ? -mission.points : 0
   const days = data.days.map((d, di) => (di !== dayIdx ? d : { ...d, missions: d.missions.filter((mi) => mi.id !== missionId) }))
-  return { days, acumulado: data.acumulado + delta }
+  return { days, ...applyPointsDelta(data, delta) }
 }
 
 export function setCounter(_data: FamilyData, value: number): Pick<FamilyData, 'acumulado'> {
@@ -130,4 +158,21 @@ export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyD
 
 export function totalMissionsDone(day: Day | undefined): number {
   return day ? day.missions.filter((m) => m.status === 'completada').length : 0
+}
+
+export function addChild(data: FamilyData, name: string, idSeed: number): Pick<FamilyData, 'children'> {
+  const trimmed = name.trim()
+  if (!trimmed) return { children: data.children }
+  const child: Child = { id: `child${idSeed}`, name: trimmed, points: 0 }
+  return { children: [...data.children, child] }
+}
+
+export function renameChild(data: FamilyData, childId: string, name: string): Pick<FamilyData, 'children'> {
+  const trimmed = name.trim()
+  if (!trimmed) return { children: data.children }
+  return { children: data.children.map((c) => (c.id === childId ? { ...c, name: trimmed } : c)) }
+}
+
+export function removeChild(data: FamilyData, childId: string): Pick<FamilyData, 'children'> {
+  return { children: data.children.filter((c) => c.id !== childId) }
 }

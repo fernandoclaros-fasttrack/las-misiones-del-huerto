@@ -9,6 +9,11 @@ import * as logic from './logic'
 type Patch = Partial<FamilyData> | null
 type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
+/** Documentos guardados antes de MOO-17 no tienen `children` — se normaliza a [] al leer. */
+function normalize(raw: FamilyData): FamilyData {
+  return raw.children ? raw : { ...raw, children: [] }
+}
+
 export function useFamilyData() {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -23,7 +28,7 @@ export function useFamilyData() {
           void setDoc(ref, seedFamilyData())
           return
         }
-        setData(snap.data() as FamilyData)
+        setData(normalize(snap.data() as FamilyData))
         setLoading(false)
       })
       return unsub
@@ -40,14 +45,14 @@ export function useFamilyData() {
       let result!: TResult
       await runTransaction(firestore, async (tx) => {
         const snap = await tx.get(ref)
-        const current = snap.data() as FamilyData
+        const current = normalize(snap.data() as FamilyData)
         const { patch, result: r } = mutator(current)
         result = r
         if (patch) tx.update(ref, patch)
       })
       return result
     }
-    const current = dataRef.current ?? localStore.get()
+    const current = normalize(dataRef.current ?? localStore.get())
     const { patch, result } = mutator(current)
     if (patch) localStore.set(patch)
     return result
@@ -87,6 +92,13 @@ export function useFamilyData() {
 
       removeConcept: (conceptId: string) =>
         run((d) => ({ patch: logic.removeConcept(d, conceptId), result: undefined })),
+
+      addChild: (name: string) => run((d) => ({ patch: logic.addChild(d, name, Date.now()), result: undefined })),
+
+      renameChild: (childId: string, name: string) =>
+        run((d) => ({ patch: logic.renameChild(d, childId, name), result: undefined })),
+
+      removeChild: (childId: string) => run((d) => ({ patch: logic.removeChild(d, childId), result: undefined })),
     }),
     [run],
   )

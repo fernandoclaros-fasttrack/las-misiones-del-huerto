@@ -3,6 +3,7 @@ import { useFamilyData } from '../shared/useFamilyData'
 import { ACCENT, todayIndex } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { CounterCard, type PanelName } from './components/CounterCard'
+import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
 import { NewMissionForm } from './components/NewMissionForm'
 import type { Mission } from '../shared/types'
@@ -28,6 +29,9 @@ export default function App() {
     redeemPoints,
     addConcept,
     removeConcept,
+    addChild,
+    renameChild,
+    removeChild,
   } = useFamilyData()
 
   const [selected, setSelected] = useState(todayIndex())
@@ -188,6 +192,13 @@ export default function App() {
             onRedeemValChange={setRedeemVal}
             onConfirmRedeem={confirmRedeem}
             redeemMsg={redeemMsg}
+          />
+
+          <ChildrenCard
+            kids={data.children}
+            onAdd={(name) => void addChild(name)}
+            onRename={(id, name) => void renameChild(id, name)}
+            onRemove={(id) => void removeChild(id)}
           />
         </div>
 

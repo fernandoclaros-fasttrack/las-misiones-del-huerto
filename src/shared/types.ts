@@ -20,11 +20,21 @@ export interface RewardConcept {
   label: string
 }
 
+export interface Child {
+  id: string
+  name: string
+  points: number
+}
+
 export interface FamilyData {
   basePoints: number
+  /** Contador compartido heredado (v1). Se mantiene mientras no haya hijos configurados;
+   *  en cuanto exista al menos un Child, los puntos de las misiones van a children[].points
+   *  en su lugar y este campo deja de recibir cambios por misiones (ver MOO-17). */
   acumulado: number
   concepts: RewardConcept[]
   days: Day[]
+  children: Child[]
 }
 
 export interface StatusMeta {
