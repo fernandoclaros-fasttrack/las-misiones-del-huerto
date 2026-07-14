@@ -6,6 +6,8 @@ import { CounterCard, type PanelName } from './components/CounterCard'
 import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
 import { NewMissionForm } from './components/NewMissionForm'
+import { SettingsMenu } from './components/SettingsMenu'
+import { downloadBackup } from './backup'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -165,6 +167,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Bitter', serif", fontWeight: 700, fontSize: 16 }}>🌿 Panel de gestión</div>
             <div style={{ fontSize: 12.5, opacity: 0.82, marginTop: 2, fontWeight: 600 }}>Las misiones del huerto · vista de padres</div>
           </div>
+          <SettingsMenu onBackup={() => downloadBackup(data)} />
         </header>
 
         <div style={{ padding: '16px 16px 8px' }}>
