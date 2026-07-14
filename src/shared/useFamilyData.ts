@@ -9,9 +9,9 @@ import * as logic from './logic'
 type Patch = Partial<FamilyData> | null
 type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
-/** Documentos guardados antes de MOO-17 no tienen `children` — se normaliza a [] al leer. */
+/** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions` — se normalizan al leer. */
 function normalize(raw: FamilyData): FamilyData {
-  return raw.children ? raw : { ...raw, children: [] }
+  return { ...raw, children: raw.children ?? [], redemptions: raw.redemptions ?? [] }
 }
 
 export function useFamilyData() {
@@ -99,6 +99,18 @@ export function useFamilyData() {
         run((d) => ({ patch: logic.renameChild(d, childId, name), result: undefined })),
 
       removeChild: (childId: string) => run((d) => ({ patch: logic.removeChild(d, childId), result: undefined })),
+
+      editChildPoints: (childId: string, value: number) =>
+        run((d) => ({ patch: logic.editChildPoints(d, childId, value), result: undefined })),
+
+      penalizeChild: (childId: string, amount: number) =>
+        run((d) => ({ patch: logic.penalizeChild(d, childId, amount), result: undefined })),
+
+      redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string }) =>
+        run((d) => {
+          const r = logic.redeemChildPoints(d, childId, points, concept, Date.now())
+          return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
+        }),
     }),
     [run],
   )

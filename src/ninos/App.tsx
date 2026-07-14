@@ -5,11 +5,18 @@ import { DayTabs } from '../shared/components/DayTabs'
 import { Header } from './components/Header'
 import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
+import { ChildPicker } from './components/ChildPicker'
+import { RedemptionHistory } from './components/RedemptionHistory'
+import { splitAmong, redemptionsForChild } from '../shared/logic'
 import type { MissionStatus } from '../shared/types'
+
+const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
 
 export default function App() {
   const { data, loading, setMissionStatus } = useFamilyData()
   const [selected, setSelected] = useState(todayIndex())
+  const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
+  const [showHistory, setShowHistory] = useState(false)
 
   const [pointsKey, setPointsKey] = useState(0)
   const [floatKey, setFloatKey] = useState(0)
@@ -31,11 +38,23 @@ export default function App() {
     timerRef.current = window.setTimeout(() => setShowFloat(false), 1000)
   }
 
-  function handleSetStatus(missionId: string, currentStatus: MissionStatus, points: number, status: MissionStatus) {
+  function selectChild(id: string) {
+    localStorage.setItem(ACTIVE_CHILD_KEY, id)
+    setActiveChildId(id)
+  }
+  function switchChild() {
+    localStorage.removeItem(ACTIVE_CHILD_KEY)
+    setActiveChildId(null)
+    setShowHistory(false)
+  }
+
+  function handleSetStatus(missionId: string, currentStatus: MissionStatus, points: number, status: MissionStatus, childCount: number, myIndex: number) {
     const wasDone = currentStatus === 'completada'
     const nowDone = status === 'completada'
     if (wasDone !== nowDone) {
-      flash(nowDone ? points : -points)
+      const totalDelta = nowDone ? points : -points
+      const myDelta = childCount > 0 ? splitAmong(totalDelta, childCount)[myIndex] ?? 0 : totalDelta
+      flash(myDelta)
       setPointsKey((k) => k + 1)
     }
     void setMissionStatus(selected, missionId, status)
@@ -59,39 +78,61 @@ export default function App() {
     )
   }
 
+  const hasChildren = data.children.length > 0
+  const activeChildIndex = hasChildren ? data.children.findIndex((c) => c.id === activeChildId) : -1
+  const activeChild = activeChildIndex >= 0 ? data.children[activeChildIndex] : null
+
+  if (hasChildren && !activeChild) {
+    return <ChildPicker accent={ACCENT} kids={data.children} onSelect={selectChild} />
+  }
+
   const day = data.days[selected]
   const missions = day?.missions ?? []
   const doneCount = missions.filter((m) => m.status === 'completada').length
+  const points = hasChildren ? (activeChild?.points ?? 0) : data.acumulado
 
   return (
     <div style={{ minHeight: '100vh', background: '#EFE7D4', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
       <div style={{ width: '100%', maxWidth: 500, display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#EFE7D4' }}>
         <Header
           accent={ACCENT}
-          points={data.acumulado}
+          points={points}
           pointsKey={pointsKey}
           showFloat={showFloat}
           floatKey={floatKey}
           floatText={floatText}
           floatColor={floatColor}
+          childName={activeChild?.name}
+          onSwitchChild={switchChild}
+          onShowHistory={hasChildren ? () => setShowHistory(true) : undefined}
         />
 
-        <DayTabs days={data.days} selected={selected} onSelect={setSelected} accent={ACCENT} variant="ninos" />
+        {hasChildren && showHistory && activeChild ? (
+          <RedemptionHistory redemptions={redemptionsForChild(data, activeChild.id)} onBack={() => setShowHistory(false)} />
+        ) : (
+          <>
+            <DayTabs days={data.days} selected={selected} onSelect={setSelected} accent={ACCENT} variant="ninos" />
 
-        <main style={{ flex: 1, padding: '8px 16px 44px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 6px 2px' }}>
-            <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 19 }}>Misiones de {day?.label}</span>
-            <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>
-              {doneCount}/{missions.length} hechas
-            </span>
-          </div>
+            <main style={{ flex: 1, padding: '8px 16px 44px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 6px 2px' }}>
+                <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 19 }}>Misiones de {day?.label}</span>
+                <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>
+                  {doneCount}/{missions.length} hechas
+                </span>
+              </div>
 
-          {missions.map((m) => (
-            <MissionCard key={m.id} mission={m} onSetStatus={(status) => handleSetStatus(m.id, m.status, m.points, status)} />
-          ))}
+              {missions.map((m) => (
+                <MissionCard
+                  key={m.id}
+                  mission={m}
+                  onSetStatus={(status) => handleSetStatus(m.id, m.status, m.points, status, data.children.length, activeChildIndex)}
+                />
+              ))}
 
-          {missions.length === 0 && <EmptyState />}
-        </main>
+              {missions.length === 0 && <EmptyState />}
+            </main>
+          </>
+        )}
       </div>
     </div>
   )

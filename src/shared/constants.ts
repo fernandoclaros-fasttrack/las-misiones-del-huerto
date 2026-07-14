@@ -105,5 +105,6 @@ export function seedFamilyData(): FamilyData {
     concepts: DEFAULT_CONCEPTS,
     days,
     children: [],
+    redemptions: [],
   }
 }

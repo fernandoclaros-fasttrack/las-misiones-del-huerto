@@ -26,6 +26,16 @@ export interface Child {
   points: number
 }
 
+export interface Redemption {
+  id: string
+  childId: string
+  points: number
+  conceptEmoji: string
+  conceptLabel: string
+  /** epoch ms */
+  timestamp: number
+}
+
 export interface FamilyData {
   basePoints: number
   /** Contador compartido heredado (v1). Se mantiene mientras no haya hijos configurados;
@@ -35,6 +45,9 @@ export interface FamilyData {
   concepts: RewardConcept[]
   days: Day[]
   children: Child[]
+  /** Histórico de canjes por hijo (MOO-22). Solo se generan al canjear puntos de un hijo
+   *  concreto (MOO-21); el canje del contador compartido (MOO-11) no genera entradas aquí. */
+  redemptions: Redemption[]
 }
 
 export interface StatusMeta {

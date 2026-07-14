@@ -1,4 +1,4 @@
-import type { Child, Day, FamilyData, Mission, MissionStatus, RewardConcept } from './types'
+import type { Child, Day, FamilyData, Mission, MissionStatus, Redemption, RewardConcept } from './types'
 
 /**
  * Reglas de negocio puras (ver README del handoff de diseño, sección "Reglas de negocio").
@@ -9,7 +9,7 @@ import type { Child, Day, FamilyData, Mission, MissionStatus, RewardConcept } fr
 
 /** Reparte `total` en `n` partes enteras lo más iguales posible; el resto (positivo o
  *  negativo) se reparte de uno en uno a los primeros hijos, en orden, para no perder nada. */
-function splitAmong(total: number, n: number): number[] {
+export function splitAmong(total: number, n: number): number[] {
   if (n <= 0) return []
   const base = Math.trunc(total / n)
   const shares = new Array(n).fill(base)
@@ -175,4 +175,49 @@ export function renameChild(data: FamilyData, childId: string, name: string): Pi
 
 export function removeChild(data: FamilyData, childId: string): Pick<FamilyData, 'children'> {
   return { children: data.children.filter((c) => c.id !== childId) }
+}
+
+export function editChildPoints(data: FamilyData, childId: string, value: number): Pick<FamilyData, 'children'> {
+  const points = Math.round(value) || 0
+  return { children: data.children.map((c) => (c.id === childId ? { ...c, points } : c)) }
+}
+
+export function penalizeChild(data: FamilyData, childId: string, amount: number): Pick<FamilyData, 'children'> {
+  const n = Math.max(0, Math.round(amount) || 0)
+  return { children: data.children.map((c) => (c.id === childId ? { ...c, points: c.points - n } : c)) }
+}
+
+export interface ChildRedeemResult {
+  ok: boolean
+  error?: string
+  children?: Child[]
+  redemptions?: Redemption[]
+}
+
+export function redeemChildPoints(
+  data: FamilyData,
+  childId: string,
+  points: number,
+  concept: { emoji: string; label: string },
+  idSeed: number,
+): ChildRedeemResult {
+  const pts = Math.round(points) || 0
+  const child = data.children.find((c) => c.id === childId)
+  if (!child) return { ok: false, error: 'No se encuentra a ese hijo/a.' }
+  if (pts <= 0) return { ok: false, error: 'Introduce cuántos puntos canjear.' }
+  if (pts > child.points) return { ok: false, error: 'No hay suficientes puntos acumulados.' }
+  const children = data.children.map((c) => (c.id === childId ? { ...c, points: c.points - pts } : c))
+  const redemption: Redemption = {
+    id: `rd${idSeed}`,
+    childId,
+    points: pts,
+    conceptEmoji: concept.emoji,
+    conceptLabel: concept.label,
+    timestamp: idSeed,
+  }
+  return { ok: true, children, redemptions: [...data.redemptions, redemption] }
+}
+
+export function redemptionsForChild(data: FamilyData, childId: string): Redemption[] {
+  return data.redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
 }
