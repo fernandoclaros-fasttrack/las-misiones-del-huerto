@@ -1,13 +1,14 @@
 rules_version = '2';
 
-// La app no tiene login (ver README): cualquiera con la URL y la config de Firebase
-// puede leer/escribir. Por eso el acceso se limita a un único documento fijo,
-// en vez de abrir toda la base de datos. Aceptable para un proyecto familiar
-// de un solo hogar, pero es una limitación de seguridad conocida (ver README).
+// La app requiere login (ver MOO-24): solo la única cuenta de Firebase Auth de la
+// familia, que protege tanto la pantalla de hijos como la de padres, puede leer o
+// escribir el documento. Esta regla es la protección real de los datos — la
+// pantalla de login por sí sola no bastaría si alguien llamara a la API de
+// Firestore directamente sin pasar por la app.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /families/default {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }

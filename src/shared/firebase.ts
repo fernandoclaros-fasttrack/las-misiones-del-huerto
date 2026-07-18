@@ -1,5 +1,6 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getAuth, type Auth } from 'firebase/auth'
 
 const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,12 +16,14 @@ export const firebaseEnabled = Boolean(config.apiKey && config.projectId)
 
 let app: FirebaseApp | undefined
 let firestore: Firestore | undefined
+let auth: Auth | undefined
 
 if (firebaseEnabled) {
   app = initializeApp(config)
   firestore = getFirestore(app)
+  auth = getAuth(app)
 }
 
-export { app, firestore }
+export { app, firestore, auth }
 
 export const FAMILY_DOC_PATH = ['families', 'default'] as const

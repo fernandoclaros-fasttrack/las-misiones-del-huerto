@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
+import { useAuth } from '../shared/useAuth'
+import { LoginScreen } from '../shared/components/LoginScreen'
 import { ACCENT, todayIndex } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { CounterCard, type PanelName } from './components/CounterCard'
@@ -17,7 +19,10 @@ interface Draft {
   days: number[]
 }
 
+const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
+
 export default function App() {
+  const { ready, isAuthed, login, logout, resetPassword } = useAuth()
   const {
     data,
     loading,
@@ -63,6 +68,20 @@ export default function App() {
       setRedeemConceptId(data.concepts[0]?.id ?? null)
     }
   }, [data, redeemConceptId])
+
+  if (!ready) {
+    return (
+      <div style={{ minHeight: '100vh', background: '#E9E0CC', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Nunito', system-ui, sans-serif", color: '#8A7E6B' }}>
+        Cargando…
+      </div>
+    )
+  }
+
+  if (!isAuthed) {
+    return (
+      <LoginScreen accent={ACCENT} background="#E9E0CC" email={AUTH_EMAIL} onLogin={login} onForgotPassword={resetPassword} />
+    )
+  }
 
   if (loading || !data) {
     return (
@@ -167,7 +186,7 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Bitter', serif", fontWeight: 700, fontSize: 16 }}>🌿 Panel de gestión</div>
             <div style={{ fontSize: 12.5, opacity: 0.82, marginTop: 2, fontWeight: 600 }}>Las misiones del huerto · vista de padres</div>
           </div>
-          <SettingsMenu onBackup={() => downloadBackup(data)} />
+          <SettingsMenu onBackup={() => downloadBackup(data)} onLogout={() => void logout()} />
         </header>
 
         <div style={{ padding: '16px 16px 8px' }}>

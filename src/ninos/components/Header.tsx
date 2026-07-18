@@ -9,9 +9,10 @@ interface Props {
   childName?: string
   onSwitchChild?: () => void
   onShowHistory?: () => void
+  onLogout: () => void
 }
 
-export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowHistory }: Props) {
+export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowHistory, onLogout }: Props) {
   return (
     <header
       style={{
@@ -25,19 +26,37 @@ export function Header({ accent, points, pointsKey, showFloat, floatKey, floatTe
         boxShadow: '0 8px 22px rgba(58,50,40,.20)',
       }}
     >
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          fontFamily: "'Bitter', serif",
-          fontWeight: 600,
-          fontSize: 14,
-          letterSpacing: 0.2,
-          opacity: 0.92,
-        }}
-      >
-        <span style={{ fontSize: 17 }}>🌿</span> Las misiones del huerto
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontFamily: "'Bitter', serif",
+            fontWeight: 600,
+            fontSize: 14,
+            letterSpacing: 0.2,
+            opacity: 0.92,
+          }}
+        >
+          <span style={{ fontSize: 17 }}>🌿</span> Las misiones del huerto
+        </div>
+        <button
+          onClick={onLogout}
+          title="Cerrar sesión"
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 10,
+            border: 'none',
+            background: 'rgba(255,255,255,.18)',
+            color: '#F6F1E2',
+            fontSize: 14,
+            cursor: 'pointer',
+          }}
+        >
+          🔒
+        </button>
       </div>
       <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 9, marginTop: 12 }}>
         <span

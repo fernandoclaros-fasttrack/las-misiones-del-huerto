@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
+import { useAuth } from '../shared/useAuth'
+import { LoginScreen } from '../shared/components/LoginScreen'
 import { ACCENT, todayIndex } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { Header } from './components/Header'
@@ -11,8 +13,10 @@ import { splitAmong, redemptionsForChild } from '../shared/logic'
 import type { MissionStatus } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
+const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
 
 export default function App() {
+  const { ready, isAuthed, login, logout, resetPassword } = useAuth()
   const { data, loading, setMissionStatus } = useFamilyData()
   const [selected, setSelected] = useState(todayIndex())
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
@@ -60,6 +64,36 @@ export default function App() {
     void setMissionStatus(selected, missionId, status)
   }
 
+  if (!ready) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#EFE7D4',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: "'Nunito', system-ui, sans-serif",
+          color: '#8A7E6B',
+        }}
+      >
+        Cargando…
+      </div>
+    )
+  }
+
+  if (!isAuthed) {
+    return (
+      <LoginScreen
+        accent={ACCENT}
+        background="#EFE7D4"
+        email={AUTH_EMAIL}
+        onLogin={login}
+        onForgotPassword={resetPassword}
+      />
+    )
+  }
+
   if (loading || !data) {
     return (
       <div
@@ -105,6 +139,7 @@ export default function App() {
           childName={activeChild?.name}
           onSwitchChild={switchChild}
           onShowHistory={hasChildren ? () => setShowHistory(true) : undefined}
+          onLogout={() => void logout()}
         />
 
         {hasChildren && showHistory && activeChild ? (

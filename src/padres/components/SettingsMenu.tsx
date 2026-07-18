@@ -2,9 +2,26 @@ import { useEffect, useRef, useState } from 'react'
 
 interface Props {
   onBackup: () => void
+  onLogout: () => void
 }
 
-export function SettingsMenu({ onBackup }: Props) {
+const ITEM_STYLE = {
+  width: '100%',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '10px 12px',
+  borderRadius: 9,
+  border: 'none',
+  background: 'transparent',
+  color: '#3A3228',
+  fontWeight: 700,
+  fontSize: 14,
+  cursor: 'pointer',
+  textAlign: 'left' as const,
+}
+
+export function SettingsMenu({ onBackup, onLogout }: Props) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
@@ -56,23 +73,18 @@ export function SettingsMenu({ onBackup }: Props) {
               onBackup()
               setOpen(false)
             }}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '10px 12px',
-              borderRadius: 9,
-              border: 'none',
-              background: 'transparent',
-              color: '#3A3228',
-              fontWeight: 700,
-              fontSize: 14,
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
+            style={ITEM_STYLE}
           >
             📥 Copia de seguridad
+          </button>
+          <button
+            onClick={() => {
+              onLogout()
+              setOpen(false)
+            }}
+            style={ITEM_STYLE}
+          >
+            🔒 Cerrar sesión
           </button>
         </div>
       )}
