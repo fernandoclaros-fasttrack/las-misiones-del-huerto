@@ -9,9 +9,16 @@ import * as logic from './logic'
 type Patch = Partial<FamilyData> | null
 type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
-/** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions` — se normalizan al leer. */
+/** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, y antes de
+ *  MOO-25 sus misiones no tienen `seriesId`/`activeDays` — se normalizan al leer. Cada misión
+ *  antigua se trata como su propia serie de un solo día (el día en el que ya vivía), que es
+ *  exactamente como se comportaba antes de MOO-25. */
 function normalize(raw: FamilyData): FamilyData {
-  return { ...raw, children: raw.children ?? [], redemptions: raw.redemptions ?? [] }
+  const days = raw.days.map((day, di) => ({
+    ...day,
+    missions: day.missions.map((mi) => ({ ...mi, seriesId: mi.seriesId ?? mi.id, activeDays: mi.activeDays ?? [di] })),
+  }))
+  return { ...raw, days, children: raw.children ?? [], redemptions: raw.redemptions ?? [] }
 }
 
 export function useFamilyData() {
@@ -66,8 +73,8 @@ export function useFamilyData() {
       addMission: (input: logic.NewMissionInput) =>
         run((d) => ({ patch: logic.addMission(d, input, Date.now()), result: undefined })),
 
-      editMission: (dayIdx: number, missionId: string, input: logic.EditMissionInput) =>
-        run((d) => ({ patch: logic.editMission(d, dayIdx, missionId, input), result: undefined })),
+      editMission: (missionId: string, input: logic.EditMissionInput) =>
+        run((d) => ({ patch: logic.editMission(d, missionId, input), result: undefined })),
 
       deleteMission: (dayIdx: number, missionId: string) =>
         run((d) => ({ patch: logic.deleteMission(d, dayIdx, missionId), result: undefined })),

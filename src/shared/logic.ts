@@ -66,9 +66,10 @@ export function addMission(data: FamilyData, input: NewMissionInput, idSeed: num
   const title = input.title.trim()
   const points = Math.max(0, Math.round(input.points) || 0)
   const targets = input.dayIndices.length ? input.dayIndices : []
+  const seriesId = `s${idSeed}`
   const days = data.days.map((day, di) => {
     if (!targets.includes(di)) return day
-    const mission: Mission = { id: `m${idSeed}-${di}`, emoji: input.emoji, title, points, status: 'pendiente' }
+    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets }
     return { ...day, missions: [...day.missions, mission] }
   })
   return { days }
@@ -78,31 +79,53 @@ export interface EditMissionInput {
   emoji: string
   title: string
   points: number
+  activeDays: number[]
 }
 
+/** Edita una misión por su `seriesId` (MOO-25): los campos compartidos (emoji, título,
+ *  puntos, días activos) se propagan a todas sus copias, se crean copias nuevas en los
+ *  días recién seleccionados (con status 'pendiente') y se eliminan las de los días que
+ *  dejan de estar activos. El status de las copias que se mantienen no se toca. */
 export function editMission(
   data: FamilyData,
-  dayIdx: number,
   missionId: string,
   input: EditMissionInput,
 ): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
   const title = input.title.trim()
   const points = Math.max(0, Math.round(input.points) || 0)
+  const activeDays = input.activeDays.length ? input.activeDays : []
+  const existing = data.days.flatMap((d) => d.missions).find((mi) => mi.id === missionId)
+  if (!existing) return { days: data.days, acumulado: data.acumulado, children: data.children }
+  const seriesId = existing.seriesId
+
   let delta = 0
   const days = data.days.map((day, di) => {
-    if (di !== dayIdx) return day
-    return {
-      ...day,
-      missions: day.missions.map((mi) => {
-        if (mi.id !== missionId) return mi
-        if (mi.status === 'completada') delta += points - mi.points
-        return { ...mi, emoji: input.emoji, title, points }
-      }),
+    const current = day.missions.find((mi) => mi.seriesId === seriesId)
+    const shouldHave = activeDays.includes(di)
+
+    if (current && shouldHave) {
+      if (current.status === 'completada') delta += points - current.points
+      return {
+        ...day,
+        missions: day.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, emoji: input.emoji, title, points, activeDays } : mi)),
+      }
     }
+    if (current && !shouldHave) {
+      if (current.status === 'completada') delta -= current.points
+      return { ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }
+    }
+    if (!current && shouldHave) {
+      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays }
+      return { ...day, missions: [...day.missions, mission] }
+    }
+    return day
   })
+
   return { days, ...applyPointsDelta(data, delta) }
 }
 
+/** Borra solo la copia del día indicado. Las copias hermanas (mismo `seriesId`) se
+ *  quedan con `activeDays` corregido para que no sigan mostrando ese día como activo. */
 export function deleteMission(
   data: FamilyData,
   dayIdx: number,
@@ -111,7 +134,15 @@ export function deleteMission(
   const day = data.days[dayIdx]
   const mission = day?.missions.find((mi) => mi.id === missionId)
   const delta = mission?.status === 'completada' ? -mission.points : 0
-  const days = data.days.map((d, di) => (di !== dayIdx ? d : { ...d, missions: d.missions.filter((mi) => mi.id !== missionId) }))
+  const seriesId = mission?.seriesId
+  const days = data.days.map((d, di) => {
+    if (di === dayIdx) return { ...d, missions: d.missions.filter((mi) => mi.id !== missionId) }
+    if (!seriesId) return d
+    return {
+      ...d,
+      missions: d.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, activeDays: mi.activeDays.filter((x) => x !== dayIdx) } : mi)),
+    }
+  })
   return { days, ...applyPointsDelta(data, delta) }
 }
 

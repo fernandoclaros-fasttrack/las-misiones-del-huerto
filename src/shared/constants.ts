@@ -30,7 +30,6 @@ export function todayIndex(): number {
 }
 
 function seedDays(): Day[] {
-  const D = (label: string, short: string, missions: Day['missions']): Day => ({ label, short, missions })
   const m = (id: string, emoji: string, title: string, points: number, status: MissionStatus = 'pendiente') => ({
     id,
     emoji,
@@ -38,7 +37,9 @@ function seedDays(): Day[] {
     points,
     status,
   })
-  return [
+  type RawDay = { label: string; short: string; missions: ReturnType<typeof m>[] }
+  const D = (label: string, short: string, missions: RawDay['missions']): RawDay => ({ label, short, missions })
+  const raw: RawDay[] = [
     D('Lunes', 'Lun', [
       m('lun1', '🛏️', 'Hacer la cama', 10),
       m('lun2', '🍴', 'Poner la mesa', 10),
@@ -92,6 +93,10 @@ function seedDays(): Day[] {
       m('dom4', '🍳', 'Ayudar a cocinar', 10),
     ]),
   ]
+  return raw.map((day, di) => ({
+    ...day,
+    missions: day.missions.map((mi) => ({ ...mi, seriesId: mi.id, activeDays: [di] })),
+  }))
 }
 
 export function seedFamilyData(): FamilyData {

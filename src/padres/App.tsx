@@ -155,7 +155,7 @@ export default function App() {
   }
   function openEditMission(mission: Mission) {
     setEditingId(mission.id)
-    setDraft({ emoji: mission.emoji, title: mission.title, points: mission.points, days: [selected] })
+    setDraft({ emoji: mission.emoji, title: mission.title, points: mission.points, days: mission.activeDays })
   }
   function cancelEdit() {
     setEditingId(null)
@@ -166,10 +166,11 @@ export default function App() {
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
+    const activeDays = draft.days.length ? draft.days : [selected]
     if (editingId === 'new') {
-      await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: draft.days.length ? draft.days : [selected] })
+      await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays })
     } else if (editingId) {
-      await editMission(selected, editingId, { emoji: draft.emoji, title: draft.title, points })
+      await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays })
     }
     setEditingId(null)
   }
@@ -246,12 +247,16 @@ export default function App() {
                 key={m.id}
                 mission={m}
                 editing={editing}
+                days={data.days}
+                accent={ACCENT}
                 draftEmoji={draft.emoji}
                 draftTitle={draft.title}
                 draftPoints={draft.points}
+                draftDays={draft.days}
                 onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
                 onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
                 onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                onToggleDraftDay={toggleDraftDay}
                 onSave={saveMission}
                 onCancel={cancelEdit}
                 onEdit={() => openEditMission(m)}

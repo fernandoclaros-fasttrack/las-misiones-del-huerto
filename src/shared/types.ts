@@ -2,10 +2,14 @@ export type MissionStatus = 'pendiente' | 'progreso' | 'bloqueada' | 'completada
 
 export interface Mission {
   id: string
+  /** Vincula las copias de una misma misión en distintos días (MOO-25). */
+  seriesId: string
   emoji: string
   title: string
   points: number
   status: MissionStatus
+  /** Días de la semana (índices, Lunes=0..Domingo=6) en los que la misión está activa (MOO-25). */
+  activeDays: number[]
 }
 
 export interface Day {
