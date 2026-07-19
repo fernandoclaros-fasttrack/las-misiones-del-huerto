@@ -62,6 +62,8 @@ export interface NewMissionInput {
   title: string
   points: number
   dayIndices: number[]
+  /** IDs de los hijos asignados (MOO-27); solo relevante cuando hay hijos configurados. */
+  assignedTo: string[]
 }
 
 export function addMission(data: FamilyData, input: NewMissionInput, idSeed: number): Pick<FamilyData, 'days'> {
@@ -71,7 +73,7 @@ export function addMission(data: FamilyData, input: NewMissionInput, idSeed: num
   const seriesId = `s${idSeed}`
   const days = data.days.map((day, di) => {
     if (!targets.includes(di)) return day
-    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets, participants: [] }
+    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets, participants: [], assignedTo: input.assignedTo }
     return { ...day, missions: [...day.missions, mission] }
   })
   return { days }
@@ -82,6 +84,8 @@ export interface EditMissionInput {
   title: string
   points: number
   activeDays: number[]
+  /** IDs de los hijos asignados (MOO-27); solo relevante cuando hay hijos configurados. */
+  assignedTo: string[]
 }
 
 /** Edita una misión por su `seriesId` (MOO-25): los campos compartidos (emoji, título,
@@ -119,7 +123,7 @@ export function editMission(
       }
       return {
         ...day,
-        missions: day.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, emoji: input.emoji, title, points, activeDays } : mi)),
+        missions: day.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, emoji: input.emoji, title, points, activeDays, assignedTo: input.assignedTo } : mi)),
       }
     }
     if (current && !shouldHave) {
@@ -134,7 +138,7 @@ export function editMission(
       return { ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }
     }
     if (!current && shouldHave) {
-      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays, participants: [] }
+      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays, participants: [], assignedTo: input.assignedTo }
       return { ...day, missions: [...day.missions, mission] }
     }
     return day
@@ -224,6 +228,14 @@ export function addConcept(
 
 export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyData, 'concepts'> {
   return { concepts: data.concepts.filter((c) => c.id !== conceptId) }
+}
+
+/** Si una misión está asignada a un hijo concreto (MOO-27). `assignedTo` vacío significa
+ *  "todos los hijos" (familias sin hijos configurados, o documentos antiguos ya cubiertos por
+ *  `normalize()`). Sin hijo activo (pantalla sin selector de hijo) siempre es visible. */
+export function isMissionVisibleTo(mission: Mission, childId: string | null): boolean {
+  if (!childId) return true
+  return mission.assignedTo.length === 0 || mission.assignedTo.includes(childId)
 }
 
 export function totalMissionsDone(day: Day | undefined): number {

@@ -34,6 +34,15 @@ for the original design spec (tokens, business rules, data model).
   `normalize()` in `src/shared/useFamilyData.ts` and the fallbacks in `src/shared/logic.ts`.
   `editMission`/`deleteMission` on an already-completed mission adjust only its recorded
   participants' points, not the whole roster.
+- **Mission assignment** (`Mission.assignedTo`, MOO-27): distinct from `participants` above —
+  this controls *visibility* (which children see the mission at all), not completion credit.
+  Parents pick assigned children when creating/editing a mission (all children checked by
+  default); the picker only appears once a family has more than one child. Missions saved before
+  MOO-27 don't have this field — `normalize()` in `src/shared/useFamilyData.ts` backfills it with
+  every *current* child's ID (not `[]`) each time the doc is read, so pre-MOO-27 "visible to
+  everyone" missions keep including children added later, until the mission is next saved with an
+  explicit selection. `isMissionVisibleTo()` in `src/shared/logic.ts` is what the kids screen
+  filters by; there's no visibility gate on the parents screen, which always shows every mission.
 - **Resetear** (parents' reset button) zeroes `acumulado`, zeroes every child's points, AND sets
   every mission across every day back to `pendiente`. It does NOT touch `redemptions` — that's a
   log of past events, not current state.

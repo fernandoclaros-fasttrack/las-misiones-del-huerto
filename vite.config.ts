@@ -7,6 +7,7 @@ import { resolve } from 'node:path'
 // server root (some preview tools poll '/' to detect readiness and never resolve otherwise).
 export default defineConfig(({ command }) => ({
   base: command === 'build' ? '/las-misiones-del-huerto/' : '/',
+  server: { port: Number(process.env.PORT) || 5173 },
   plugins: [react()],
   build: {
     rollupOptions: {

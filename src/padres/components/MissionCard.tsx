@@ -1,21 +1,25 @@
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
 import { EMOJI_PALETTE, STATUS_META } from '../../shared/constants'
-import type { Day, Mission, MissionStatus } from '../../shared/types'
+import type { Child, Day, Mission, MissionStatus } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
 interface Props {
   mission: Mission
   editing: boolean
   days: Day[]
+  /** Hijos de la familia; el selector de asignación (MOO-27) solo aparece si hay más de uno. */
+  kids: Child[]
   accent: string
   draftEmoji: string
   draftTitle: string
   draftPoints: number | string
   draftDays: number[]
+  draftAssignedTo: string[]
   onDraftEmojiChange: (emoji: string) => void
   onDraftTitleChange: (title: string) => void
   onDraftPointsChange: (points: string) => void
   onToggleDraftDay: (index: number) => void
+  onToggleDraftChild: (childId: string) => void
   onSave: () => void
   onCancel: () => void
   onEdit: () => void
@@ -27,15 +31,18 @@ export function MissionCard({
   mission,
   editing,
   days,
+  kids,
   accent,
   draftEmoji,
   draftTitle,
   draftPoints,
   draftDays,
+  draftAssignedTo,
   onDraftEmojiChange,
   onDraftTitleChange,
   onDraftPointsChange,
   onToggleDraftDay,
+  onToggleDraftChild,
   onSave,
   onCancel,
   onEdit,
@@ -77,6 +84,30 @@ export function MissionCard({
           })}
         </div>
 
+        {kids.length > 1 && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#7C6E52', margin: '12px 0 6px' }}>¿A quién está asignada?</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {kids.map((kid) => {
+                const on = draftAssignedTo.includes(kid.id)
+                return (
+                  <button
+                    key={kid.id}
+                    onClick={() => onToggleDraftChild(kid.id)}
+                    style={
+                      on
+                        ? { padding: '8px 12px', borderRadius: 11, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 13, background: accent, color: '#F6F1E2' }
+                        : { padding: '8px 12px', borderRadius: 11, border: '1px solid #D6CBB2', cursor: 'pointer', fontWeight: 800, fontSize: 13, background: '#fff', color: '#8A7C60' }
+                    }
+                  >
+                    {kid.name}
+                  </button>
+                )
+              })}
+            </div>
+          </>
+        )}
+
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
           <button onClick={onSave} style={BTN_SAVE}>
             Guardar
@@ -99,6 +130,13 @@ export function MissionCard({
           .map((i) => days[i]?.short)
           .filter(Boolean)
           .join(' · ')
+  const assignedToLabel =
+    kids.length > 1 && mission.assignedTo.length > 0 && mission.assignedTo.length < kids.length
+      ? ` · ${kids
+          .filter((k) => mission.assignedTo.includes(k.id))
+          .map((k) => k.name)
+          .join(' · ')}`
+      : ''
   const selectStyle = {
     width: '100%',
     padding: '9px 12px',
@@ -122,6 +160,7 @@ export function MissionCard({
           <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
           <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 700, marginTop: 2 }}>
             {mission.points} pts · {activeDaysLabel}
+            {assignedToLabel}
           </div>
         </div>
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>

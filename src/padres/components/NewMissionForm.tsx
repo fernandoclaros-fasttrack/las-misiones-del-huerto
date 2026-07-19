@@ -1,15 +1,19 @@
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
 import { EMOJI_PALETTE } from '../../shared/constants'
-import type { Day } from '../../shared/types'
+import type { Child, Day } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
 interface Props {
   days: Day[]
+  /** Hijos de la familia; el selector de asignación (MOO-27) solo aparece si hay más de uno. */
+  kids: Child[]
   accent: string
   emoji: string
   onEmojiChange: (emoji: string) => void
   selectedDays: number[]
   onToggleDay: (index: number) => void
+  assignedTo: string[]
+  onToggleChild: (childId: string) => void
   title: string
   onTitleChange: (title: string) => void
   points: number | string
@@ -18,7 +22,7 @@ interface Props {
   onCancel: () => void
 }
 
-export function NewMissionForm({ days, accent, emoji, onEmojiChange, selectedDays, onToggleDay, title, onTitleChange, points, onPointsChange, onSave, onCancel }: Props) {
+export function NewMissionForm({ days, kids, accent, emoji, onEmojiChange, selectedDays, onToggleDay, assignedTo, onToggleChild, title, onTitleChange, points, onPointsChange, onSave, onCancel }: Props) {
   return (
     <div style={{ background: '#FBF7EC', border: '2px dashed #C9BE9F', borderRadius: 18, padding: '15px 16px' }}>
       <div style={{ fontSize: 13, fontWeight: 800, color: '#7C6E52', marginBottom: 8 }}>Nueva misión</div>
@@ -45,6 +49,30 @@ export function NewMissionForm({ days, accent, emoji, onEmojiChange, selectedDay
           )
         })}
       </div>
+
+      {kids.length > 1 && (
+        <>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: '#7C6E52', marginBottom: 6 }}>¿A quién está asignada?</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+            {kids.map((kid) => {
+              const on = assignedTo.includes(kid.id)
+              return (
+                <button
+                  key={kid.id}
+                  onClick={() => onToggleChild(kid.id)}
+                  style={
+                    on
+                      ? { padding: '8px 12px', borderRadius: 11, border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: 13, background: accent, color: '#F6F1E2' }
+                      : { padding: '8px 12px', borderRadius: 11, border: '1px solid #D6CBB2', cursor: 'pointer', fontWeight: 800, fontSize: 13, background: '#fff', color: '#8A7C60' }
+                  }
+                >
+                  {kid.name}
+                </button>
+              )
+            })}
+          </div>
+        </>
+      )}
 
       <input value={title} onChange={(e) => onTitleChange(e.target.value)} placeholder="Título de la misión" style={INPUT_STYLE} />
       <div style={{ display: 'flex', gap: 8, marginTop: 9, alignItems: 'center' }}>

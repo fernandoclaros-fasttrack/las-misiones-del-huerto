@@ -14,6 +14,11 @@ export interface Mission {
    *  contenido mientras `status === 'completada'` y solo se usa cuando hay hijos configurados;
    *  se vacía al descompletar la misión. */
   participants: string[]
+  /** IDs de los hijos a los que está asignada la misión (MOO-27); solo se usa cuando hay hijos
+   *  configurados. Las misiones creadas antes de MOO-27 no tienen este campo — `normalize()` en
+   *  useFamilyData.ts las trata como asignadas a todos los hijos actuales (comportamiento previo
+   *  a esta funcionalidad), recalculado en cada lectura hasta que la misión se guarde de nuevo. */
+  assignedTo: string[]
 }
 
 export interface Day {

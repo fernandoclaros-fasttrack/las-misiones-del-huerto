@@ -17,6 +17,8 @@ interface Draft {
   title: string
   points: number | string
   days: number[]
+  /** IDs de los hijos asignados (MOO-27); irrelevante mientras no haya hijos configurados. */
+  assignedTo: string[]
 }
 
 const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
@@ -58,7 +60,7 @@ export default function App() {
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
-  const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [] })
+  const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
 
   // Mantiene el concepto de canje seleccionado válido: por defecto el primero,
   // y si el seleccionado se borra, cae al siguiente disponible.
@@ -151,11 +153,17 @@ export default function App() {
 
   function openAdd() {
     setEditingId('new')
-    setDraft({ emoji: '🌱', title: '', points: 10, days: [selected] })
+    setDraft({ emoji: '🌱', title: '', points: 10, days: [selected], assignedTo: data!.children.map((c) => c.id) })
   }
   function openEditMission(mission: Mission) {
     setEditingId(mission.id)
-    setDraft({ emoji: mission.emoji, title: mission.title, points: mission.points, days: mission.activeDays })
+    setDraft({
+      emoji: mission.emoji,
+      title: mission.title,
+      points: mission.points,
+      days: mission.activeDays,
+      assignedTo: mission.assignedTo.length ? mission.assignedTo : data!.children.map((c) => c.id),
+    })
   }
   function cancelEdit() {
     setEditingId(null)
@@ -163,14 +171,17 @@ export default function App() {
   function toggleDraftDay(i: number) {
     setDraft((d) => (d.days.includes(i) ? { ...d, days: d.days.filter((x) => x !== i) } : { ...d, days: [...d.days, i] }))
   }
+  function toggleDraftChild(childId: string) {
+    setDraft((d) => (d.assignedTo.includes(childId) ? { ...d, assignedTo: d.assignedTo.filter((x) => x !== childId) } : { ...d, assignedTo: [...d.assignedTo, childId] }))
+  }
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
     const activeDays = draft.days.length ? draft.days : [selected]
     if (editingId === 'new') {
-      await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays })
+      await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays, assignedTo: draft.assignedTo })
     } else if (editingId) {
-      await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays })
+      await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays, assignedTo: draft.assignedTo })
     }
     setEditingId(null)
   }
@@ -248,15 +259,18 @@ export default function App() {
                 mission={m}
                 editing={editing}
                 days={data.days}
+                kids={data.children}
                 accent={ACCENT}
                 draftEmoji={draft.emoji}
                 draftTitle={draft.title}
                 draftPoints={draft.points}
                 draftDays={draft.days}
+                draftAssignedTo={draft.assignedTo}
                 onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
                 onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
                 onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
                 onToggleDraftDay={toggleDraftDay}
+                onToggleDraftChild={toggleDraftChild}
                 onSave={saveMission}
                 onCancel={cancelEdit}
                 onEdit={() => openEditMission(m)}
@@ -269,11 +283,14 @@ export default function App() {
           {editingId === 'new' && (
             <NewMissionForm
               days={data.days}
+              kids={data.children}
               accent={ACCENT}
               emoji={draft.emoji}
               onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
               selectedDays={draft.days}
               onToggleDay={toggleDraftDay}
+              assignedTo={draft.assignedTo}
+              onToggleChild={toggleDraftChild}
               title={draft.title}
               onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
               points={draft.points}
