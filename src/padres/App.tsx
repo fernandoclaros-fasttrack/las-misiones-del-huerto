@@ -29,7 +29,6 @@ export default function App() {
   const {
     data,
     loading,
-    setMissionStatus,
     addMission,
     editMission,
     deleteMission,
@@ -303,7 +302,6 @@ export default function App() {
                 onEdit={() => openEditMission(m)}
                 onDuplicate={() => void handleDuplicateMission(m)}
                 onDelete={() => void handleDeleteMission(m)}
-                onStatusChange={(status) => void setMissionStatus(selected, m.id, status)}
               />
             )
           })}

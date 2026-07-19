@@ -1,6 +1,6 @@
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE, STATUS_META } from '../../shared/constants'
-import type { Child, Day, Mission, MissionStatus } from '../../shared/types'
+import { EMOJI_PALETTE } from '../../shared/constants'
+import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
 interface Props {
@@ -25,7 +25,6 @@ interface Props {
   onEdit: () => void
   onDuplicate: () => void
   onDelete: () => void
-  onStatusChange: (status: MissionStatus) => void
 }
 
 export function MissionCard({
@@ -49,7 +48,6 @@ export function MissionCard({
   onEdit,
   onDuplicate,
   onDelete,
-  onStatusChange,
 }: Props) {
   const cardStyle = { background: '#FFFDF6', border: '1px solid #EADFCB', borderRadius: 18, padding: '14px 15px', boxShadow: '0 2px 5px rgba(58,50,40,.05)' }
 
@@ -122,7 +120,6 @@ export function MissionCard({
     )
   }
 
-  const meta = STATUS_META[mission.status]
   const activeDaysLabel =
     mission.activeDays.length === days.length
       ? 'Todos los días'
@@ -139,18 +136,6 @@ export function MissionCard({
           .map((k) => k.name)
           .join(' · ')}`
       : ''
-  const selectStyle = {
-    width: '100%',
-    padding: '9px 12px',
-    borderRadius: 11,
-    border: `1.5px solid ${meta.ring}`,
-    background: meta.bg,
-    color: meta.fg,
-    fontWeight: 800,
-    fontSize: 14,
-    cursor: 'pointer',
-    WebkitAppearance: 'menulist' as const,
-  }
 
   return (
     <div style={cardStyle}>
@@ -174,14 +159,6 @@ export function MissionCard({
         <button onClick={onDelete} title="Borrar" style={ICON_BTN}>
           🗑️
         </button>
-      </div>
-      <div style={{ marginTop: 11 }}>
-        <select value={mission.status} onChange={(e) => onStatusChange(e.target.value as MissionStatus)} style={selectStyle}>
-          <option value="pendiente">🌰 Pendiente</option>
-          <option value="progreso">🌱 En progreso</option>
-          <option value="bloqueada">🥀 Bloqueada</option>
-          <option value="completada">🌻 Completada</option>
-        </select>
       </div>
     </div>
   )
