@@ -10,6 +10,10 @@ export interface Mission {
   status: MissionStatus
   /** Días de la semana (índices, Lunes=0..Domingo=6) en los que la misión está activa (MOO-25). */
   activeDays: number[]
+  /** IDs de los hijos que participaron en la completación actual (MOO-26). Solo tiene
+   *  contenido mientras `status === 'completada'` y solo se usa cuando hay hijos configurados;
+   *  se vacía al descompletar la misión. */
+  participants: string[]
 }
 
 export interface Day {

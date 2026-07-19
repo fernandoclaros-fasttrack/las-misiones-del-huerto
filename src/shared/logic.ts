@@ -7,28 +7,11 @@ import type { Child, Day, FamilyData, Mission, MissionStatus, Redemption, Reward
  * (dos pantallas -hijos y padres- pueden estar abiertas a la vez).
  */
 
-/** Reparte `total` en `n` partes enteras lo más iguales posible; el resto (positivo o
- *  negativo) se reparte de uno en uno a los primeros hijos, en orden, para no perder nada. */
-export function splitAmong(total: number, n: number): number[] {
-  if (n <= 0) return []
-  const base = Math.trunc(total / n)
-  const shares = new Array(n).fill(base)
-  let remainder = total - base * n
-  const step = remainder > 0 ? 1 : -1
-  for (let i = 0; remainder !== 0; i = (i + 1) % n) {
-    shares[i] += step
-    remainder -= step
-  }
-  return shares
-}
-
-/** Aplica un delta de puntos a los hijos (repartido a partes iguales) si hay alguno
- *  configurado; si no, cae al contador compartido heredado (comportamiento de v1 intacto). */
-function applyPointsDelta(data: FamilyData, delta: number): Pick<FamilyData, 'acumulado' | 'children'> {
-  if (data.children.length === 0) return { acumulado: data.acumulado + delta, children: data.children }
-  const shares = splitAmong(delta, data.children.length)
-  const children = data.children.map((c, i) => ({ ...c, points: c.points + shares[i] }))
-  return { acumulado: data.acumulado, children }
+/** Aplica un delta de puntos a un subconjunto de hijos (los participantes de la misión).
+ *  Los hijos que no participaron no reciben ni pierden puntos por este cambio. */
+function applyParticipantDelta(children: Child[], participantIds: string[], delta: number): Child[] {
+  const ids = new Set(participantIds)
+  return children.map((c) => (ids.has(c.id) ? { ...c, points: c.points + delta } : c))
 }
 
 export function setMissionStatus(
@@ -36,8 +19,11 @@ export function setMissionStatus(
   dayIdx: number,
   missionId: string,
   status: MissionStatus,
+  participantIds?: string[],
 ): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
-  let delta = 0
+  const hasChildren = data.children.length > 0
+  let acumulado = data.acumulado
+  let children = data.children
   const days = data.days.map((day, di) => {
     if (di !== dayIdx) return day
     return {
@@ -46,13 +32,29 @@ export function setMissionStatus(
         if (mi.id !== missionId || mi.status === status) return mi
         const was = mi.status === 'completada'
         const now = status === 'completada'
-        if (was && !now) delta -= mi.points
-        if (!was && now) delta += mi.points
+        if (!hasChildren) {
+          if (was && !now) acumulado -= mi.points
+          if (!was && now) acumulado += mi.points
+          return { ...mi, status }
+        }
+        if (!was && now) {
+          // MOO-26: todos los hijos participan por defecto; solo los seleccionados reciben la
+          // recompensa completa (no se reparte).
+          const participants = participantIds?.length ? participantIds : data.children.map((c) => c.id)
+          children = applyParticipantDelta(children, participants, mi.points)
+          return { ...mi, status, participants }
+        }
+        if (was && !now) {
+          // Deshace usando los participantes con los que se completó, no la selección actual.
+          const participants = mi.participants.length ? mi.participants : data.children.map((c) => c.id)
+          children = applyParticipantDelta(children, participants, -mi.points)
+          return { ...mi, status, participants: [] }
+        }
         return { ...mi, status }
       }),
     }
   })
-  return { days, ...applyPointsDelta(data, delta) }
+  return { days, acumulado, children }
 }
 
 export interface NewMissionInput {
@@ -69,7 +71,7 @@ export function addMission(data: FamilyData, input: NewMissionInput, idSeed: num
   const seriesId = `s${idSeed}`
   const days = data.days.map((day, di) => {
     if (!targets.includes(di)) return day
-    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets }
+    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets, participants: [] }
     return { ...day, missions: [...day.missions, mission] }
   })
   return { days }
@@ -97,31 +99,48 @@ export function editMission(
   const existing = data.days.flatMap((d) => d.missions).find((mi) => mi.id === missionId)
   if (!existing) return { days: data.days, acumulado: data.acumulado, children: data.children }
   const seriesId = existing.seriesId
+  const hasChildren = data.children.length > 0
 
-  let delta = 0
+  let acumulado = data.acumulado
+  let children = data.children
   const days = data.days.map((day, di) => {
     const current = day.missions.find((mi) => mi.seriesId === seriesId)
     const shouldHave = activeDays.includes(di)
 
     if (current && shouldHave) {
-      if (current.status === 'completada') delta += points - current.points
+      if (current.status === 'completada') {
+        const delta = points - current.points
+        if (hasChildren) {
+          const participants = current.participants.length ? current.participants : data.children.map((c) => c.id)
+          children = applyParticipantDelta(children, participants, delta)
+        } else {
+          acumulado += delta
+        }
+      }
       return {
         ...day,
         missions: day.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, emoji: input.emoji, title, points, activeDays } : mi)),
       }
     }
     if (current && !shouldHave) {
-      if (current.status === 'completada') delta -= current.points
+      if (current.status === 'completada') {
+        if (hasChildren) {
+          const participants = current.participants.length ? current.participants : data.children.map((c) => c.id)
+          children = applyParticipantDelta(children, participants, -current.points)
+        } else {
+          acumulado -= current.points
+        }
+      }
       return { ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }
     }
     if (!current && shouldHave) {
-      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays }
+      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays, participants: [] }
       return { ...day, missions: [...day.missions, mission] }
     }
     return day
   })
 
-  return { days, ...applyPointsDelta(data, delta) }
+  return { days, acumulado, children }
 }
 
 /** Borra solo la copia del día indicado. Las copias hermanas (mismo `seriesId`) se
@@ -133,7 +152,17 @@ export function deleteMission(
 ): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
   const day = data.days[dayIdx]
   const mission = day?.missions.find((mi) => mi.id === missionId)
-  const delta = mission?.status === 'completada' ? -mission.points : 0
+  const hasChildren = data.children.length > 0
+  let acumulado = data.acumulado
+  let children = data.children
+  if (mission?.status === 'completada') {
+    if (hasChildren) {
+      const participants = mission.participants.length ? mission.participants : data.children.map((c) => c.id)
+      children = applyParticipantDelta(children, participants, -mission.points)
+    } else {
+      acumulado -= mission.points
+    }
+  }
   const seriesId = mission?.seriesId
   const days = data.days.map((d, di) => {
     if (di === dayIdx) return { ...d, missions: d.missions.filter((mi) => mi.id !== missionId) }
@@ -143,7 +172,7 @@ export function deleteMission(
       missions: d.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, activeDays: mi.activeDays.filter((x) => x !== dayIdx) } : mi)),
     }
   })
-  return { days, ...applyPointsDelta(data, delta) }
+  return { days, acumulado, children }
 }
 
 export function setCounter(_data: FamilyData, value: number): Pick<FamilyData, 'acumulado'> {
@@ -161,7 +190,9 @@ export function applyPenalty(data: FamilyData, amount: number): Pick<FamilyData,
 export function resetCounter(data: FamilyData): Pick<FamilyData, 'acumulado' | 'children' | 'days'> {
   const days = data.days.map((day) => ({
     ...day,
-    missions: day.missions.map((mi) => (mi.status === 'pendiente' ? mi : { ...mi, status: 'pendiente' as const })),
+    missions: day.missions.map((mi) =>
+      mi.status === 'pendiente' && mi.participants.length === 0 ? mi : { ...mi, status: 'pendiente' as const, participants: [] },
+    ),
   }))
   const children = data.children.map((c) => (c.points === 0 ? c : { ...c, points: 0 }))
   return { acumulado: 0, children, days }

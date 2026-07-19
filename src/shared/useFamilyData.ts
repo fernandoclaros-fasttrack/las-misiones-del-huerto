@@ -9,14 +9,20 @@ import * as logic from './logic'
 type Patch = Partial<FamilyData> | null
 type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
-/** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, y antes de
- *  MOO-25 sus misiones no tienen `seriesId`/`activeDays` — se normalizan al leer. Cada misión
- *  antigua se trata como su propia serie de un solo día (el día en el que ya vivía), que es
- *  exactamente como se comportaba antes de MOO-25. */
+/** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, antes de
+ *  MOO-25 sus misiones no tienen `seriesId`/`activeDays`, y antes de MOO-26 no tienen
+ *  `participants` — se normalizan al leer. Cada misión antigua se trata como su propia serie
+ *  de un solo día (el día en el que ya vivía), que es exactamente como se comportaba antes de
+ *  MOO-25; `participants` vacío se comporta como "todos los hijos", igual que antes de MOO-26. */
 function normalize(raw: FamilyData): FamilyData {
   const days = raw.days.map((day, di) => ({
     ...day,
-    missions: day.missions.map((mi) => ({ ...mi, seriesId: mi.seriesId ?? mi.id, activeDays: mi.activeDays ?? [di] })),
+    missions: day.missions.map((mi) => ({
+      ...mi,
+      seriesId: mi.seriesId ?? mi.id,
+      activeDays: mi.activeDays ?? [di],
+      participants: mi.participants ?? [],
+    })),
   }))
   return { ...raw, days, children: raw.children ?? [], redemptions: raw.redemptions ?? [] }
 }
@@ -67,8 +73,8 @@ export function useFamilyData() {
 
   const actions = useMemo(
     () => ({
-      setMissionStatus: (dayIdx: number, missionId: string, status: MissionStatus) =>
-        run((d) => ({ patch: logic.setMissionStatus(d, dayIdx, missionId, status), result: undefined })),
+      setMissionStatus: (dayIdx: number, missionId: string, status: MissionStatus, participantIds?: string[]) =>
+        run((d) => ({ patch: logic.setMissionStatus(d, dayIdx, missionId, status, participantIds), result: undefined })),
 
       addMission: (input: logic.NewMissionInput) =>
         run((d) => ({ patch: logic.addMission(d, input, Date.now()), result: undefined })),

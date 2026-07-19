@@ -95,7 +95,7 @@ function seedDays(): Day[] {
   ]
   return raw.map((day, di) => ({
     ...day,
-    missions: day.missions.map((mi) => ({ ...mi, seriesId: mi.id, activeDays: [di] })),
+    missions: day.missions.map((mi) => ({ ...mi, seriesId: mi.id, activeDays: [di], participants: [] })),
   }))
 }
 

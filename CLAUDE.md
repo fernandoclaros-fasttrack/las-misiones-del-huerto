@@ -22,10 +22,18 @@ for the original design spec (tokens, business rules, data model).
 
 - **Shared counter vs per-child points**: `FamilyData.acumulado` is the original v1 shared
   counter. Once at least one `Child` exists (`FamilyData.children`), mission point deltas route
-  to `children[].points` instead (split evenly, remainder to the first children in array order —
-  see `splitAmong` in `src/shared/logic.ts`), and `acumulado` stops being touched by missions.
-  With zero children, everything behaves exactly like v1 — this fallback is deliberate
+  to `children[].points` instead, and `acumulado` stops being touched by missions. With zero
+  children, everything behaves exactly like v1 — this fallback is deliberate
   backward-compatibility, not a bug.
+- **Mission participants** (`Mission.participants`, MOO-26): when a family has children, completing
+  a mission asks which children participated (all selected by default) — each selected child gets
+  the mission's **full** `points` (not split). `participants` records who was credited so
+  un-completing reverses the exact same set, even if the child roster changes afterward. It's
+  cleared back to `[]` when the mission isn't `completada`. Docs written before MOO-26 (or a
+  mission whose `participants` is empty while completed) are treated as "all children" — see
+  `normalize()` in `src/shared/useFamilyData.ts` and the fallbacks in `src/shared/logic.ts`.
+  `editMission`/`deleteMission` on an already-completed mission adjust only its recorded
+  participants' points, not the whole roster.
 - **Resetear** (parents' reset button) zeroes `acumulado`, zeroes every child's points, AND sets
   every mission across every day back to `pendiente`. It does NOT touch `redemptions` — that's a
   log of past events, not current state.

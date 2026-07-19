@@ -9,8 +9,8 @@ import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedemptionHistory } from './components/RedemptionHistory'
-import { splitAmong, redemptionsForChild } from '../shared/logic'
-import type { MissionStatus } from '../shared/types'
+import { redemptionsForChild } from '../shared/logic'
+import type { Mission, MissionStatus } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
 const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
@@ -52,16 +52,26 @@ export default function App() {
     setShowHistory(false)
   }
 
-  function handleSetStatus(missionId: string, currentStatus: MissionStatus, points: number, status: MissionStatus, childCount: number, myIndex: number) {
-    const wasDone = currentStatus === 'completada'
+  function handleSetStatus(mission: Mission, status: MissionStatus, participantIds: string[] | undefined, myChildId: string | null, allChildIds: string[]) {
+    const wasDone = mission.status === 'completada'
     const nowDone = status === 'completada'
     if (wasDone !== nowDone) {
-      const totalDelta = nowDone ? points : -points
-      const myDelta = childCount > 0 ? splitAmong(totalDelta, childCount)[myIndex] ?? 0 : totalDelta
-      flash(myDelta)
-      setPointsKey((k) => k + 1)
+      let myDelta = 0
+      if (!myChildId) {
+        myDelta = nowDone ? mission.points : -mission.points
+      } else if (nowDone) {
+        const participants = participantIds?.length ? participantIds : allChildIds
+        if (participants.includes(myChildId)) myDelta = mission.points
+      } else {
+        const participants = mission.participants.length ? mission.participants : allChildIds
+        if (participants.includes(myChildId)) myDelta = -mission.points
+      }
+      if (myDelta !== 0) {
+        flash(myDelta)
+        setPointsKey((k) => k + 1)
+      }
     }
-    void setMissionStatus(selected, missionId, status)
+    void setMissionStatus(selected, mission.id, status, participantIds)
   }
 
   if (!ready) {
@@ -160,7 +170,10 @@ export default function App() {
                 <MissionCard
                   key={m.id}
                   mission={m}
-                  onSetStatus={(status) => handleSetStatus(m.id, m.status, m.points, status, data.children.length, activeChildIndex)}
+                  kids={data.children}
+                  onSetStatus={(status, participantIds) =>
+                    handleSetStatus(m, status, participantIds, activeChild?.id ?? null, data.children.map((c) => c.id))
+                  }
                 />
               ))}
 
