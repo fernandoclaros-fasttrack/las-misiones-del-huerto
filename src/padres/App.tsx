@@ -8,9 +8,11 @@ import { Toast } from '../shared/components/Toast'
 import { CounterCard, type PanelName } from './components/CounterCard'
 import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
+import { MissionsList } from './components/MissionsList'
 import { NewMissionForm } from './components/NewMissionForm'
 import { SettingsMenu } from './components/SettingsMenu'
 import { downloadBackup } from './backup'
+import { sortedMissions } from '../shared/logic'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -33,6 +35,8 @@ export default function App() {
     editMission,
     deleteMission,
     duplicateMission,
+    reorderMissions,
+    resetMissionOrder,
     setCounter,
     applyPenalty,
     resetCounter,
@@ -62,6 +66,12 @@ export default function App() {
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
+
+  /** Orden optimista tras arrastrar/resetear (MOO-29): la transacción de Firestore tarda un
+   *  poco en reflejarse en `data`, así que mientras se resuelve mostramos el orden elegido
+   *  localmente para no dar sensación de que el arrastre "no ha hecho nada". Se descarta en
+   *  cuanto la operación se resuelve, momento en el que `data` ya trae el mismo orden. */
+  const [pendingOrder, setPendingOrder] = useState<{ dayIdx: number; ids: string[] } | null>(null)
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
@@ -106,7 +116,13 @@ export default function App() {
   }
 
   const day = data.days[selected]
-  const missions = day?.missions ?? []
+  const rawMissions = day ? sortedMissions(day) : []
+  const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
+  const missions =
+    pendingOrder && pendingOrder.dayIdx === selected
+      ? pendingOrder.ids.map((id) => missionsById.get(id)).filter((m): m is Mission => !!m)
+      : rawMissions
+  const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
   function selectDay(i: number) {
     setSelected(i)
@@ -214,6 +230,17 @@ export default function App() {
     })
     showToast(`Misión "${mission.title}" duplicada`)
   }
+  async function handleReorder(missionIds: string[]) {
+    setPendingOrder({ dayIdx: selected, ids: missionIds })
+    await reorderMissions(selected, missionIds)
+    setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
+  }
+  async function handleResetOrder() {
+    const alphaIds = [...missions].sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })).map((m) => m.id)
+    setPendingOrder({ dayIdx: selected, ids: alphaIds })
+    await resetMissionOrder(selected)
+    setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#E9E0CC', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
@@ -277,34 +304,48 @@ export default function App() {
             <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
           </div>
 
-          {missions.map((m) => {
-            const editing = editingId === m.id
-            return (
-              <MissionCard
-                key={m.id}
-                mission={m}
-                editing={editing}
-                days={data.days}
-                kids={data.children}
-                accent={ACCENT}
-                draftEmoji={draft.emoji}
-                draftTitle={draft.title}
-                draftPoints={draft.points}
-                draftDays={draft.days}
-                draftAssignedTo={draft.assignedTo}
-                onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-                onToggleDraftDay={toggleDraftDay}
-                onToggleDraftChild={toggleDraftChild}
-                onSave={saveMission}
-                onCancel={cancelEdit}
-                onEdit={() => openEditMission(m)}
-                onDuplicate={() => void handleDuplicateMission(m)}
-                onDelete={() => void handleDeleteMission(m)}
-              />
-            )
-          })}
+          {hasCustomOrder && (
+            <button
+              onClick={() => void handleResetOrder()}
+              style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
+            >
+              ↺ Orden alfabético
+            </button>
+          )}
+
+          <MissionsList
+            missions={missions}
+            disabled={editingId !== null}
+            onReorder={(ids) => void handleReorder(ids)}
+            renderItem={(m, dragHandle) => {
+              const editing = editingId === m.id
+              return (
+                <MissionCard
+                  mission={m}
+                  editing={editing}
+                  days={data.days}
+                  kids={data.children}
+                  accent={ACCENT}
+                  dragHandle={dragHandle}
+                  draftEmoji={draft.emoji}
+                  draftTitle={draft.title}
+                  draftPoints={draft.points}
+                  draftDays={draft.days}
+                  draftAssignedTo={draft.assignedTo}
+                  onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                  onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                  onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                  onToggleDraftDay={toggleDraftDay}
+                  onToggleDraftChild={toggleDraftChild}
+                  onSave={saveMission}
+                  onCancel={cancelEdit}
+                  onEdit={() => openEditMission(m)}
+                  onDuplicate={() => void handleDuplicateMission(m)}
+                  onDelete={() => void handleDeleteMission(m)}
+                />
+              )
+            }}
+          />
 
           {editingId === 'new' && (
             <NewMissionForm

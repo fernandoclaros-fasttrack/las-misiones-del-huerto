@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
 import { EMOJI_PALETTE } from '../../shared/constants'
 import type { Child, Day, Mission } from '../../shared/types'
@@ -10,6 +11,9 @@ interface Props {
   /** Hijos de la familia; el selector de asignación (MOO-27) solo aparece si hay más de uno. */
   kids: Child[]
   accent: string
+  /** Asa de arrastre para reordenar (MOO-29); `null` cuando no se puede arrastrar (editando,
+   *  o solo hay una misión ese día). Se renderiza tal cual, la gestiona `MissionsList`. */
+  dragHandle?: ReactNode
   draftEmoji: string
   draftTitle: string
   draftPoints: number | string
@@ -33,6 +37,7 @@ export function MissionCard({
   days,
   kids,
   accent,
+  dragHandle,
   draftEmoji,
   draftTitle,
   draftPoints,
@@ -140,6 +145,7 @@ export function MissionCard({
   return (
     <div style={cardStyle}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        {dragHandle}
         <div style={{ flex: '0 0 auto', width: 46, height: 46, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, background: '#F1ECDD' }}>
           {mission.emoji}
         </div>

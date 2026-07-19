@@ -25,6 +25,11 @@ export interface Day {
   label: string
   short: string
   missions: Mission[]
+  /** IDs de misión en el orden manual elegido por el padre/madre (MOO-29). Vacío = orden
+   *  alfabético por título (por defecto). Los IDs que ya no existan se ignoran; las misiones
+   *  no listadas aquí (recién creadas, o todas si el array está vacío) se añaden ordenadas
+   *  alfabéticamente al final — ver `sortedMissions()` en logic.ts. */
+  missionOrder: string[]
 }
 
 export interface RewardConcept {

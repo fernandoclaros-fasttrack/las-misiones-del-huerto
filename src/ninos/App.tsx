@@ -9,7 +9,7 @@ import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedemptionHistory } from './components/RedemptionHistory'
-import { isMissionVisibleTo, redemptionsForChild } from '../shared/logic'
+import { isMissionVisibleTo, redemptionsForChild, sortedMissions } from '../shared/logic'
 import type { Mission, MissionStatus } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
@@ -131,7 +131,7 @@ export default function App() {
   }
 
   const day = data.days[selected]
-  const missions = (day?.missions ?? []).filter((m) => isMissionVisibleTo(m, activeChild?.id ?? null))
+  const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild?.id ?? null))
   const doneCount = missions.filter((m) => m.status === 'completada').length
   const points = hasChildren ? (activeChild?.points ?? 0) : data.acumulado
 

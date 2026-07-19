@@ -154,7 +154,11 @@ export function editMission(
  *  duplicar; como todas las copias de una serie comparten `activeDays`, ese día siempre
  *  forma parte de la nueva serie y `newMissionId` es la copia visible en ese día. En cada
  *  día la copia se inserta justo debajo de la misión original (no al final de la lista),
- *  para que quede visible sin tener que hacer scroll. */
+ *  para que quede visible sin tener que hacer scroll; si ese día tiene un orden manual
+ *  (MOO-29) que incluye a la original, la copia se añade justo después en `missionOrder`
+ *  también, para conservar esa misma adyacencia. Si la original no está en el orden manual
+ *  (cae en el bloque alfabético), no hace falta tocar `missionOrder`: el título de la copia
+ *  comparte prefijo con el original, así que el orden alfabético ya las deja juntas. */
 export function duplicateMission(
   data: FamilyData,
   dayIdx: number,
@@ -184,7 +188,13 @@ export function duplicateMission(
       originalIdx === -1
         ? [...day.missions, mission]
         : [...day.missions.slice(0, originalIdx + 1), mission, ...day.missions.slice(originalIdx + 1)]
-    return { ...day, missions }
+    const siblingId = originalIdx === -1 ? null : day.missions[originalIdx].id
+    const orderPos = siblingId ? (day.missionOrder ?? []).indexOf(siblingId) : -1
+    const missionOrder =
+      orderPos === -1
+        ? (day.missionOrder ?? [])
+        : [...day.missionOrder.slice(0, orderPos + 1), mission.id, ...day.missionOrder.slice(orderPos + 1)]
+    return { ...day, missions, missionOrder }
   })
   return { days, newMissionId }
 }
@@ -278,6 +288,35 @@ export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyD
 export function isMissionVisibleTo(mission: Mission, childId: string | null): boolean {
   if (!childId) return true
   return mission.assignedTo.length === 0 || mission.assignedTo.includes(childId)
+}
+
+function byTitle(a: Mission, b: Mission): number {
+  return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })
+}
+
+/** Orden de visualización de las misiones de un día (MOO-29). Si `missionOrder` tiene
+ *  entradas, respeta ese orden manual (ignorando IDs que ya no existan) y añade al final,
+ *  ordenadas alfabéticamente, las misiones que no estén en la lista (recién creadas o
+ *  documentos sin orden manual todavía). Si `missionOrder` está vacío, todo se ordena
+ *  alfabéticamente — ese es el estado "resetear orden" y también el de una familia nueva. */
+export function sortedMissions(day: Day): Mission[] {
+  const order = day.missionOrder ?? []
+  if (!order.length) return [...day.missions].sort(byTitle)
+  const byId = new Map(day.missions.map((mi) => [mi.id, mi]))
+  const ordered = order.map((id) => byId.get(id)).filter((mi): mi is Mission => !!mi)
+  const orderedIds = new Set(ordered.map((mi) => mi.id))
+  const rest = day.missions.filter((mi) => !orderedIds.has(mi.id)).sort(byTitle)
+  return [...ordered, ...rest]
+}
+
+export function reorderMissions(data: FamilyData, dayIdx: number, missionIds: string[]): Pick<FamilyData, 'days'> {
+  const days = data.days.map((day, di) => (di === dayIdx ? { ...day, missionOrder: missionIds } : day))
+  return { days }
+}
+
+export function resetMissionOrder(data: FamilyData, dayIdx: number): Pick<FamilyData, 'days'> {
+  const days = data.days.map((day, di) => (di === dayIdx ? { ...day, missionOrder: [] } : day))
+  return { days }
 }
 
 export function totalMissionsDone(day: Day | undefined): number {

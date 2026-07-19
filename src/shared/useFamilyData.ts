@@ -11,16 +11,20 @@ type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
 /** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, antes de
  *  MOO-25 sus misiones no tienen `seriesId`/`activeDays`, antes de MOO-26 no tienen
- *  `participants`, y antes de MOO-27 no tienen `assignedTo` — se normalizan al leer. Cada
- *  misión antigua se trata como su propia serie de un solo día (el día en el que ya vivía), que
- *  es exactamente como se comportaba antes de MOO-25; `participants` vacío se comporta como
- *  "todos los hijos", igual que antes de MOO-26. `assignedTo` que falta se rellena con los IDs
- *  de todos los hijos actuales (no `[]`) para reproducir exactamente el "visible para todos" de
- *  antes de MOO-27, incluyendo hijos añadidos después de que se guardara la misión por última vez. */
+ *  `participants`, antes de MOO-27 no tienen `assignedTo`, y antes de MOO-29 sus días no
+ *  tienen `missionOrder` — se normalizan al leer. Cada misión antigua se trata como su propia
+ *  serie de un solo día (el día en el que ya vivía), que es exactamente como se comportaba
+ *  antes de MOO-25; `participants` vacío se comporta como "todos los hijos", igual que antes
+ *  de MOO-26. `assignedTo` que falta se rellena con los IDs de todos los hijos actuales (no
+ *  `[]`) para reproducir exactamente el "visible para todos" de antes de MOO-27, incluyendo
+ *  hijos añadidos después de que se guardara la misión por última vez. `missionOrder` que
+ *  falta se rellena con `[]` (orden alfabético por defecto), igual que el comportamiento
+ *  previo a MOO-29. */
 function normalize(raw: FamilyData): FamilyData {
   const children = raw.children ?? []
   const days = raw.days.map((day, di) => ({
     ...day,
+    missionOrder: day.missionOrder ?? [],
     missions: day.missions.map((mi) => ({
       ...mi,
       seriesId: mi.seriesId ?? mi.id,
@@ -95,6 +99,12 @@ export function useFamilyData() {
           const { days, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())
           return { patch: newMissionId ? { days } : null, result: newMissionId }
         }),
+
+      reorderMissions: (dayIdx: number, missionIds: string[]) =>
+        run((d) => ({ patch: logic.reorderMissions(d, dayIdx, missionIds), result: undefined })),
+
+      resetMissionOrder: (dayIdx: number) =>
+        run((d) => ({ patch: logic.resetMissionOrder(d, dayIdx), result: undefined })),
 
       setCounter: (value: number) => run((d) => ({ patch: logic.setCounter(d, value), result: undefined })),
 
