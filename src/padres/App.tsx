@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
 import { useAuth } from '../shared/useAuth'
 import { LoginScreen } from '../shared/components/LoginScreen'
 import { ACCENT, todayIndex } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
+import { Toast } from '../shared/components/Toast'
 import { CounterCard, type PanelName } from './components/CounterCard'
 import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
@@ -62,6 +63,17 @@ export default function App() {
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
+
+  const [toast, setToast] = useState<string | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
+  useEffect(() => () => {
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+  }, [])
+  function showToast(message: string) {
+    setToast(message)
+    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 2200)
+  }
 
   // Mantiene el concepto de canje seleccionado válido: por defecto el primero,
   // y si el seleccionado se borra, cae al siguiente disponible.
@@ -201,10 +213,12 @@ export default function App() {
       days: mission.activeDays,
       assignedTo: mission.assignedTo,
     })
+    showToast(`Misión "${mission.title}" duplicada`)
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#E9E0CC', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
+      <Toast message={toast} />
       <div style={{ width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <header style={{ background: ACCENT, color: '#F6F1E2', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>

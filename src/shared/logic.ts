@@ -152,7 +152,9 @@ export function editMission(
  *  'pendiente' y sin participantes, y no comparte `seriesId` con el original, así que
  *  editar o borrar una no afecta a la otra. `dayIdx` es el día desde el que se pulsó
  *  duplicar; como todas las copias de una serie comparten `activeDays`, ese día siempre
- *  forma parte de la nueva serie y `newMissionId` es la copia visible en ese día. */
+ *  forma parte de la nueva serie y `newMissionId` es la copia visible en ese día. En cada
+ *  día la copia se inserta justo debajo de la misión original (no al final de la lista),
+ *  para que quede visible sin tener que hacer scroll. */
 export function duplicateMission(
   data: FamilyData,
   dayIdx: number,
@@ -177,7 +179,12 @@ export function duplicateMission(
       participants: [],
       assignedTo: source.assignedTo,
     }
-    return { ...day, missions: [...day.missions, mission] }
+    const originalIdx = day.missions.findIndex((mi) => mi.seriesId === source.seriesId)
+    const missions =
+      originalIdx === -1
+        ? [...day.missions, mission]
+        : [...day.missions.slice(0, originalIdx + 1), mission, ...day.missions.slice(originalIdx + 1)]
+    return { ...day, missions }
   })
   return { days, newMissionId }
 }
