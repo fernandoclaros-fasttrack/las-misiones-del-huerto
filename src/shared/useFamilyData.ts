@@ -90,6 +90,12 @@ export function useFamilyData() {
       deleteMission: (dayIdx: number, missionId: string) =>
         run((d) => ({ patch: logic.deleteMission(d, dayIdx, missionId), result: undefined })),
 
+      duplicateMission: (dayIdx: number, missionId: string) =>
+        run((d) => {
+          const { days, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())
+          return { patch: newMissionId ? { days } : null, result: newMissionId }
+        }),
+
       setCounter: (value: number) => run((d) => ({ patch: logic.setCounter(d, value), result: undefined })),
 
       applyPenalty: (amount: number) => run((d) => ({ patch: logic.applyPenalty(d, amount), result: undefined })),

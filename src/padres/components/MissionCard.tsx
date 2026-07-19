@@ -23,6 +23,7 @@ interface Props {
   onSave: () => void
   onCancel: () => void
   onEdit: () => void
+  onDuplicate: () => void
   onDelete: () => void
   onStatusChange: (status: MissionStatus) => void
 }
@@ -46,6 +47,7 @@ export function MissionCard({
   onSave,
   onCancel,
   onEdit,
+  onDuplicate,
   onDelete,
   onStatusChange,
 }: Props) {
@@ -165,6 +167,9 @@ export function MissionCard({
         </div>
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>
           ✏️
+        </button>
+        <button onClick={onDuplicate} title="Duplicar" style={ICON_BTN}>
+          📋
         </button>
         <button onClick={onDelete} title="Borrar" style={ICON_BTN}>
           🗑️

@@ -32,6 +32,7 @@ export default function App() {
     addMission,
     editMission,
     deleteMission,
+    duplicateMission,
     setCounter,
     applyPenalty,
     resetCounter,
@@ -189,6 +190,18 @@ export default function App() {
     await deleteMission(selected, mission.id)
     if (editingId === mission.id) setEditingId(null)
   }
+  async function handleDuplicateMission(mission: Mission) {
+    const newId = await duplicateMission(selected, mission.id)
+    if (!newId) return
+    setEditingId(newId)
+    setDraft({
+      emoji: mission.emoji,
+      title: `${mission.title} (copia)`,
+      points: mission.points,
+      days: mission.activeDays,
+      assignedTo: mission.assignedTo,
+    })
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#E9E0CC', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
@@ -274,6 +287,7 @@ export default function App() {
                 onSave={saveMission}
                 onCancel={cancelEdit}
                 onEdit={() => openEditMission(m)}
+                onDuplicate={() => void handleDuplicateMission(m)}
                 onDelete={() => void handleDeleteMission(m)}
                 onStatusChange={(status) => void setMissionStatus(selected, m.id, status)}
               />

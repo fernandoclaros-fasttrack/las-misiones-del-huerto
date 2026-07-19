@@ -147,6 +147,41 @@ export function editMission(
   return { days, acumulado, children }
 }
 
+/** Duplica una misión (MOO-28) como una serie independiente: mismo emoji, puntos, días
+ *  activos e hijos asignados, con el título marcado como copia. La copia nace en estado
+ *  'pendiente' y sin participantes, y no comparte `seriesId` con el original, así que
+ *  editar o borrar una no afecta a la otra. `dayIdx` es el día desde el que se pulsó
+ *  duplicar; como todas las copias de una serie comparten `activeDays`, ese día siempre
+ *  forma parte de la nueva serie y `newMissionId` es la copia visible en ese día. */
+export function duplicateMission(
+  data: FamilyData,
+  dayIdx: number,
+  missionId: string,
+  idSeed: number,
+): { days: Day[]; newMissionId: string | null } {
+  const source = data.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
+  if (!source) return { days: data.days, newMissionId: null }
+  const seriesId = `s${idSeed}`
+  const title = `${source.title} (copia)`
+  const newMissionId = `m${idSeed}-${dayIdx}`
+  const days = data.days.map((day, di) => {
+    if (!source.activeDays.includes(di)) return day
+    const mission: Mission = {
+      id: `m${idSeed}-${di}`,
+      seriesId,
+      emoji: source.emoji,
+      title,
+      points: source.points,
+      status: 'pendiente',
+      activeDays: source.activeDays,
+      participants: [],
+      assignedTo: source.assignedTo,
+    }
+    return { ...day, missions: [...day.missions, mission] }
+  })
+  return { days, newMissionId }
+}
+
 /** Borra solo la copia del día indicado. Las copias hermanas (mismo `seriesId`) se
  *  quedan con `activeDays` corregido para que no sigan mostrando ese día como activo. */
 export function deleteMission(
