@@ -205,7 +205,11 @@ export default function App() {
 
   function openAdd() {
     setEditingId('new')
-    setDraft({ emoji: '🌱', title: '', points: 10, days: [selected], assignedTo: data!.children.map((c) => c.id) })
+    // Desde la vista por día se preselecciona el día que se está viendo (`selected`); desde
+    // "Todo" ese valor no tiene relación con nada que el usuario haya elegido ahí, así que se
+    // preselecciona el día de hoy en su lugar — sigue siendo un punto de partida editable.
+    const days = globalView ? [todayIndex()] : [selected]
+    setDraft({ emoji: '🌱', title: '', points: 10, days, assignedTo: data!.children.map((c) => c.id) })
   }
   function openEditMission(mission: Mission) {
     setEditingId(mission.id)
@@ -232,9 +236,10 @@ export default function App() {
     // Si se desmarcan todos los días, hay que decidir un día de respaldo: en la vista por día
     // se usa el día que se está viendo (`selected`), pero ese mismo valor no tiene relación con
     // lo que el usuario ve en la vista global "Todo" (puede ser el de hoy, o el último día
-    // visitado) — ahí el respaldo correcto es no tocar los días que ya tenía la misión.
+    // visitado) — ahí el respaldo correcto es no tocar los días que ya tenía la misión (o, si es
+    // una misión nueva y por tanto no tiene días previos, el día de hoy).
     const fallbackDays = globalView
-      ? (data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.activeDays ?? [selected])
+      ? (data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.activeDays ?? [todayIndex()])
       : [selected]
     const activeDays = draft.days.length ? draft.days : fallbackDays
     if (editingId === 'new') {
@@ -373,6 +378,7 @@ export default function App() {
               onSave={saveMission}
               onCancel={cancelEdit}
               onEdit={openEditMission}
+              onAdd={openAdd}
             />
           ) : (
             <>

@@ -1,5 +1,6 @@
 import { MissionCard } from './MissionCard'
 import { MissionsList } from './MissionsList'
+import { NewMissionForm } from './NewMissionForm'
 import type { Child, Day, Mission } from '../../shared/types'
 
 interface Props {
@@ -24,6 +25,7 @@ interface Props {
   onSave: () => void
   onCancel: () => void
   onEdit: (mission: Mission) => void
+  onAdd: () => void
 }
 
 /** Vista global de todas las misiones configuradas (MOO-30): una fila por serie de misión
@@ -53,6 +55,7 @@ export function GlobalMissionsView({
   onSave,
   onCancel,
   onEdit,
+  onAdd,
 }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -103,6 +106,35 @@ export function GlobalMissionsView({
             />
           )}
         />
+      )}
+
+      {editingId === 'new' && (
+        <NewMissionForm
+          days={days}
+          kids={kids}
+          accent={accent}
+          emoji={draftEmoji}
+          onEmojiChange={onDraftEmojiChange}
+          selectedDays={draftDays}
+          onToggleDay={onToggleDraftDay}
+          assignedTo={draftAssignedTo}
+          onToggleChild={onToggleDraftChild}
+          title={draftTitle}
+          onTitleChange={onDraftTitleChange}
+          points={draftPoints}
+          onPointsChange={onDraftPointsChange}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
+      )}
+
+      {editingId !== 'new' && (
+        <button
+          onClick={onAdd}
+          style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+        >
+          ＋ Añadir misión
+        </button>
       )}
     </div>
   )
