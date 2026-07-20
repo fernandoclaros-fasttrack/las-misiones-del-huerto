@@ -53,8 +53,9 @@ export default function App() {
   } = useFamilyData()
 
   const [selected, setSelected] = useState(todayIndex())
-  /** Vista global de misiones (MOO-30): alterna el área de misiones entre la vista por día
-   *  (con sus pestañas y edición) y una vista de solo lectura con todas las series de misión
+  /** Vista global de misiones (MOO-30): activada desde la pestaña extra "Todo" en `DayTabs`,
+   *  junto a los días de la semana. Alterna el área de misiones entre la vista por día (con
+   *  edición, arrastre, etc.) y una vista de solo lectura con todas las series de misión
    *  configuradas, independiente del día seleccionado. */
   const [globalView, setGlobalView] = useState(false)
 
@@ -130,7 +131,12 @@ export default function App() {
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
   function selectDay(i: number) {
+    setGlobalView(false)
     setSelected(i)
+    setEditingId(null)
+  }
+  function selectGlobalView() {
+    setGlobalView(true)
     setEditingId(null)
   }
 
@@ -301,16 +307,14 @@ export default function App() {
           />
         </div>
 
-        {!globalView && <DayTabs days={data.days} selected={selected} onSelect={selectDay} accent={ACCENT} variant="padres" />}
-
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: globalView ? '10px 16px 0' : '2px 16px 0' }}>
-          <button
-            onClick={() => setGlobalView((v) => !v)}
-            style={{ border: 'none', background: 'transparent', color: '#47702F', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
-          >
-            {globalView ? '📅 Ver por día' : '🗂️ Ver todas las misiones'}
-          </button>
-        </div>
+        <DayTabs
+          days={data.days}
+          selected={selected}
+          onSelect={selectDay}
+          accent={ACCENT}
+          variant="padres"
+          extraTab={{ label: 'Todo', selected: globalView, onSelect: selectGlobalView }}
+        />
 
         <main style={{ flex: 1, padding: '6px 16px 40px', display: 'flex', flexDirection: 'column', gap: 11 }}>
           {globalView ? (
