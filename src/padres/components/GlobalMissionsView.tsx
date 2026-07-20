@@ -73,6 +73,33 @@ export function GlobalMissionsView({
         <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
       </div>
 
+      {editingId === 'new' ? (
+        <NewMissionForm
+          days={days}
+          kids={kids}
+          accent={accent}
+          emoji={draftEmoji}
+          onEmojiChange={onDraftEmojiChange}
+          selectedDays={draftDays}
+          onToggleDay={onToggleDraftDay}
+          assignedTo={draftAssignedTo}
+          onToggleChild={onToggleDraftChild}
+          title={draftTitle}
+          onTitleChange={onDraftTitleChange}
+          points={draftPoints}
+          onPointsChange={onDraftPointsChange}
+          onSave={onSave}
+          onCancel={onCancel}
+        />
+      ) : (
+        <button
+          onClick={onAdd}
+          style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+        >
+          ＋ Añadir misión
+        </button>
+      )}
+
       {hasCustomOrder && (
         <button
           onClick={onResetOrder}
@@ -117,35 +144,6 @@ export function GlobalMissionsView({
             />
           )}
         />
-      )}
-
-      {editingId === 'new' && (
-        <NewMissionForm
-          days={days}
-          kids={kids}
-          accent={accent}
-          emoji={draftEmoji}
-          onEmojiChange={onDraftEmojiChange}
-          selectedDays={draftDays}
-          onToggleDay={onToggleDraftDay}
-          assignedTo={draftAssignedTo}
-          onToggleChild={onToggleDraftChild}
-          title={draftTitle}
-          onTitleChange={onDraftTitleChange}
-          points={draftPoints}
-          onPointsChange={onDraftPointsChange}
-          onSave={onSave}
-          onCancel={onCancel}
-        />
-      )}
-
-      {editingId !== 'new' && (
-        <button
-          onClick={onAdd}
-          style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
-        >
-          ＋ Añadir misión
-        </button>
       )}
     </div>
   )
