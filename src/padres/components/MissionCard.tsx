@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE } from '../../shared/constants'
+import { EMOJI_PALETTE, WEEKDAY_INITIALS } from '../../shared/constants'
 import { assignedToLabel } from '../../shared/logic'
 import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
@@ -142,19 +142,20 @@ export function MissionCard({
               {mission.points} pts
             </span>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
-            {days.map((d, i) => {
+          <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+            {WEEKDAY_INITIALS.map((letter, i) => {
               const on = mission.activeDays.includes(i)
               return (
                 <span
-                  key={d.short}
-                  style={
-                    on
-                      ? { padding: '2px 7px', borderRadius: 8, fontWeight: 800, fontSize: 10.5, background: accent, color: '#F6F1E2' }
-                      : { padding: '2px 7px', borderRadius: 8, fontWeight: 800, fontSize: 10.5, background: '#FBF7EC', color: '#B7AA8A', border: '1px solid #E4D8BC' }
-                  }
+                  key={i}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    color: on ? accent : '#D6CBB2',
+                  }}
                 >
-                  {d.short}
+                  {letter}
                 </span>
               )
             })}
