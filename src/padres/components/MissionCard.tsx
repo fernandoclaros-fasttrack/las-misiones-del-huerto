@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
 import { EMOJI_PALETTE } from '../../shared/constants'
+import { activeDaysLabel, assignedToLabel } from '../../shared/logic'
 import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
@@ -125,22 +126,8 @@ export function MissionCard({
     )
   }
 
-  const activeDaysLabel =
-    mission.activeDays.length === days.length
-      ? 'Todos los días'
-      : mission.activeDays
-          .slice()
-          .sort((a, b) => a - b)
-          .map((i) => days[i]?.short)
-          .filter(Boolean)
-          .join(' · ')
-  const assignedToLabel =
-    kids.length > 1 && mission.assignedTo.length > 0 && mission.assignedTo.length < kids.length
-      ? ` · ${kids
-          .filter((k) => mission.assignedTo.includes(k.id))
-          .map((k) => k.name)
-          .join(' · ')}`
-      : ''
+  const daysLabel = activeDaysLabel(mission, days)
+  const assignedLabel = assignedToLabel(mission, kids)
 
   return (
     <div style={cardStyle}>
@@ -152,8 +139,8 @@ export function MissionCard({
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
           <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 700, marginTop: 2 }}>
-            {mission.points} pts · {activeDaysLabel}
-            {assignedToLabel}
+            {mission.points} pts · {daysLabel}
+            {assignedLabel}
           </div>
         </div>
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>

@@ -290,8 +290,42 @@ export function isMissionVisibleTo(mission: Mission, childId: string | null): bo
   return mission.assignedTo.length === 0 || mission.assignedTo.includes(childId)
 }
 
-function byTitle(a: Mission, b: Mission): number {
+export function byTitle(a: Mission, b: Mission): number {
   return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })
+}
+
+/** Etiqueta legible de los días activos de una misión (p. ej. "Lun · Mié" o "Todos los días"). */
+export function activeDaysLabel(mission: Mission, days: Day[]): string {
+  if (mission.activeDays.length === days.length) return 'Todos los días'
+  return mission.activeDays
+    .slice()
+    .sort((a, b) => a - b)
+    .map((i) => days[i]?.short)
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** Etiqueta de a qué hijos está asignada una misión; vacía si es "todos" o hay un solo hijo. */
+export function assignedToLabel(mission: Mission, kids: Child[]): string {
+  if (kids.length <= 1 || mission.assignedTo.length === 0 || mission.assignedTo.length >= kids.length) return ''
+  return ` · ${kids
+    .filter((k) => mission.assignedTo.includes(k.id))
+    .map((k) => k.name)
+    .join(' · ')}`
+}
+
+/** Misiones únicas por `seriesId` (MOO-30): cada serie tiene una copia por día activo en
+ *  `Day.missions`, pero los campos compartidos (título, puntos, emoji, días, asignación) son
+ *  idénticos en todas sus copias, así que basta con quedarse con la primera que aparece.
+ *  Ordenadas alfabéticamente, igual que el orden por defecto de una vista de día. */
+export function uniqueMissionSeries(days: Day[]): Mission[] {
+  const bySeriesId = new Map<string, Mission>()
+  days.forEach((day) => {
+    day.missions.forEach((mi) => {
+      if (!bySeriesId.has(mi.seriesId)) bySeriesId.set(mi.seriesId, mi)
+    })
+  })
+  return [...bySeriesId.values()].sort(byTitle)
 }
 
 /** Orden de visualización de las misiones de un día (MOO-29). Si `missionOrder` tiene
