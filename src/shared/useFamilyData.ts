@@ -100,8 +100,8 @@ export function useFamilyData() {
 
       duplicateMission: (dayIdx: number, missionId: string) =>
         run((d) => {
-          const { days, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())
-          return { patch: newMissionId ? { days } : null, result: newMissionId }
+          const { days, globalMissionOrder, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())
+          return { patch: newMissionId ? { days, globalMissionOrder } : null, result: newMissionId }
         }),
 
       reorderMissions: (dayIdx: number, missionIds: string[]) =>

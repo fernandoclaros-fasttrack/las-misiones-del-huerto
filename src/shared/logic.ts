@@ -156,17 +156,21 @@ export function editMission(
  *  día la copia se inserta justo debajo de la misión original (no al final de la lista),
  *  para que quede visible sin tener que hacer scroll; si ese día tiene un orden manual
  *  (MOO-29) que incluye a la original, la copia se añade justo después en `missionOrder`
- *  también, para conservar esa misma adyacencia. Si la original no está en el orden manual
- *  (cae en el bloque alfabético), no hace falta tocar `missionOrder`: el título de la copia
- *  comparte prefijo con el original, así que el orden alfabético ya las deja juntas. */
+ *  también, para conservar esa misma adyacencia. Lo mismo aplica al orden manual de la vista
+ *  global "Todo" (MOO-30): si `globalMissionOrder` incluye a la serie original, la nueva serie
+ *  se añade justo después ahí también — si no, duplicar una misión en medio de una lista
+ *  reordenada a mano la mandaría al final (bloque alfabético) en vez de quedar junto al
+ *  original. Si la original no está en ninguno de los dos órdenes manuales (cae en el bloque
+ *  alfabético), no hace falta tocarlos: el título de la copia comparte prefijo con el
+ *  original, así que el orden alfabético ya las deja juntas. */
 export function duplicateMission(
   data: FamilyData,
   dayIdx: number,
   missionId: string,
   idSeed: number,
-): { days: Day[]; newMissionId: string | null } {
+): { days: Day[]; globalMissionOrder: string[]; newMissionId: string | null } {
   const source = data.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
-  if (!source) return { days: data.days, newMissionId: null }
+  if (!source) return { days: data.days, globalMissionOrder: data.globalMissionOrder, newMissionId: null }
   const seriesId = `s${idSeed}`
   const title = `${source.title} (copia)`
   const newMissionId = `m${idSeed}-${dayIdx}`
@@ -196,7 +200,12 @@ export function duplicateMission(
         : [...day.missionOrder.slice(0, orderPos + 1), mission.id, ...day.missionOrder.slice(orderPos + 1)]
     return { ...day, missions, missionOrder }
   })
-  return { days, newMissionId }
+  const globalOrderPos = (data.globalMissionOrder ?? []).indexOf(source.seriesId)
+  const globalMissionOrder =
+    globalOrderPos === -1
+      ? data.globalMissionOrder
+      : [...data.globalMissionOrder.slice(0, globalOrderPos + 1), seriesId, ...data.globalMissionOrder.slice(globalOrderPos + 1)]
+  return { days, globalMissionOrder, newMissionId }
 }
 
 /** Borra solo la copia del día indicado. Las copias hermanas (mismo `seriesId`) se
