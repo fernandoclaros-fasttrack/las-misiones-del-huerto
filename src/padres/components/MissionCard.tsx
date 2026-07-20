@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
 import { EMOJI_PALETTE } from '../../shared/constants'
-import { activeDaysLabel, assignedToLabel } from '../../shared/logic'
+import { assignedToLabel } from '../../shared/logic'
 import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
@@ -126,7 +126,6 @@ export function MissionCard({
     )
   }
 
-  const daysLabel = activeDaysLabel(mission, days)
   const assignedLabel = assignedToLabel(mission, kids)
 
   return (
@@ -137,11 +136,30 @@ export function MissionCard({
           {mission.emoji}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
-          <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 700, marginTop: 2 }}>
-            {mission.points} pts · {daysLabel}
-            {assignedLabel}
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2, minWidth: 0 }}>{mission.title}</div>
+            <span style={{ flex: '0 0 auto', background: '#F1ECDD', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+              {mission.points} pts
+            </span>
           </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+            {days.map((d, i) => {
+              const on = mission.activeDays.includes(i)
+              return (
+                <span
+                  key={d.short}
+                  style={
+                    on
+                      ? { padding: '2px 7px', borderRadius: 8, fontWeight: 800, fontSize: 10.5, background: accent, color: '#F6F1E2' }
+                      : { padding: '2px 7px', borderRadius: 8, fontWeight: 800, fontSize: 10.5, background: '#FBF7EC', color: '#B7AA8A', border: '1px solid #E4D8BC' }
+                  }
+                >
+                  {d.short}
+                </span>
+              )
+            })}
+          </div>
+          {assignedLabel && <div style={{ fontSize: 12, color: '#8A7E6B', fontWeight: 700, marginTop: 3 }}>{assignedLabel}</div>}
         </div>
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>
           ✏️
