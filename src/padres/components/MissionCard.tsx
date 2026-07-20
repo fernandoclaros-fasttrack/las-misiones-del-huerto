@@ -145,30 +145,51 @@ export function MissionCard({
           {mission.emoji}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2, minWidth: 0 }}>{mission.title}</div>
+          <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 5 }}>
+            <div role="group" aria-label={`Días activos: ${activeDaysDescription}`} style={{ display: 'flex', gap: 4 }}>
+              {WEEKDAY_INITIALS.map((letter, i) => {
+                const on = mission.activeDays.includes(i)
+                return (
+                  <span
+                    key={i}
+                    aria-hidden="true"
+                    style={
+                      on
+                        ? {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            background: accent,
+                            color: '#F6F1E2',
+                          }
+                        : {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 16,
+                            height: 16,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            color: '#8A7C60',
+                          }
+                    }
+                  >
+                    {letter}
+                  </span>
+                )
+              })}
+            </div>
             <span style={{ flex: '0 0 auto', background: '#F1ECDD', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
               {mission.points} pts
             </span>
-          </div>
-          <div role="group" aria-label={`Días activos: ${activeDaysDescription}`} style={{ display: 'flex', gap: 5, marginTop: 4 }}>
-            {WEEKDAY_INITIALS.map((letter, i) => {
-              const on = mission.activeDays.includes(i)
-              return (
-                <span
-                  key={i}
-                  aria-hidden="true"
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 800,
-                    lineHeight: 1,
-                    color: on ? accent : '#8A7C60',
-                  }}
-                >
-                  {letter}
-                </span>
-              )
-            })}
           </div>
           {assignedLabel && <div style={{ fontSize: 12, color: '#8A7E6B', fontWeight: 700, marginTop: 3 }}>{assignedLabel}</div>}
         </div>
