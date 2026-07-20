@@ -231,6 +231,30 @@ export function deleteMission(
   return { days, acumulado, children }
 }
 
+/** Borra una serie de misión entera (MOO-30): todas sus copias en todos los días, no solo
+ *  la de un día concreto (a diferencia de `deleteMission`). Es lo que "Borrar" tiene que
+ *  significar en la vista global "Todo": esa vista no tiene un día de referencia, así que un
+ *  borrado parcial dejaría la fila viéndose igual (con otra copia como representante) sin dar
+ *  ninguna señal de que "borrar" hizo algo. Ajusta puntos por cada copia que estuviera
+ *  `completada` en su propio día — cada copia tiene su propio estado independiente. */
+export function deleteMissionSeries(data: FamilyData, seriesId: string): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
+  const hasChildren = data.children.length > 0
+  let acumulado = data.acumulado
+  let children = data.children
+  data.days.forEach((day) => {
+    const mission = day.missions.find((mi) => mi.seriesId === seriesId)
+    if (mission?.status !== 'completada') return
+    if (hasChildren) {
+      const participants = mission.participants.length ? mission.participants : data.children.map((c) => c.id)
+      children = applyParticipantDelta(children, participants, -mission.points)
+    } else {
+      acumulado -= mission.points
+    }
+  })
+  const days = data.days.map((day) => ({ ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }))
+  return { days, acumulado, children }
+}
+
 export function setCounter(_data: FamilyData, value: number): Pick<FamilyData, 'acumulado'> {
   return { acumulado: Math.round(value) || 0 }
 }

@@ -95,6 +95,9 @@ export function useFamilyData() {
       deleteMission: (dayIdx: number, missionId: string) =>
         run((d) => ({ patch: logic.deleteMission(d, dayIdx, missionId), result: undefined })),
 
+      deleteMissionSeries: (seriesId: string) =>
+        run((d) => ({ patch: logic.deleteMissionSeries(d, seriesId), result: undefined })),
+
       duplicateMission: (dayIdx: number, missionId: string) =>
         run((d) => {
           const { days, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())

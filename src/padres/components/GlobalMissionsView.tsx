@@ -26,13 +26,20 @@ interface Props {
   onCancel: () => void
   onEdit: (mission: Mission) => void
   onAdd: () => void
+  onDuplicate: (mission: Mission) => void
+  /** Borra la serie entera (todas sus copias), no solo una — ver `deleteMissionSeries` en
+   *  logic.ts. A diferencia de la vista por día, aquí no hay un día de referencia para "borrar
+   *  solo esta copia". */
+  onDelete: (mission: Mission) => void
 }
 
 /** Vista global de todas las misiones configuradas (MOO-30): una fila por serie de misión
- *  (deduplicadas por `seriesId` en `sortedMissionSeries`), con edición y reordenamiento por
- *  arrastre igual que en la vista por día — reutiliza `MissionCard`/`MissionsList` tal cual.
- *  Duplicar y borrar quedan fuera: esas acciones operan sobre la copia de un día concreto y
- *  esta vista no tiene un día de referencia. */
+ *  (deduplicadas por `seriesId` en `sortedMissionSeries`), con edición, duplicado, borrado y
+ *  reordenamiento por arrastre — reutiliza `MissionCard`/`MissionsList` tal cual. Duplicar
+ *  respeta los mismos días activos que el original (igual que desde un día concreto). Borrar
+ *  aquí elimina la serie de todos los días a la vez: no hay un día de referencia para borrar
+ *  solo una copia, y dejar la fila viéndose igual (con otra copia como representante) daría la
+ *  sensación de que "borrar" no hizo nada. */
 export function GlobalMissionsView({
   missions,
   days,
@@ -56,6 +63,8 @@ export function GlobalMissionsView({
   onCancel,
   onEdit,
   onAdd,
+  onDuplicate,
+  onDelete,
 }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -103,6 +112,8 @@ export function GlobalMissionsView({
               onSave={onSave}
               onCancel={onCancel}
               onEdit={() => onEdit(m)}
+              onDuplicate={() => onDuplicate(m)}
+              onDelete={() => onDelete(m)}
             />
           )}
         />

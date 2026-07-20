@@ -63,6 +63,17 @@ for the original design spec (tokens, business rules, data model).
   readiness and hangs forever if dev doesn't resolve at `/`.
 - Repo is **public** (required for free GitHub Pages) but contains no user data — that all lives
   in Firestore, gated by the rules above.
+- **"Todo" tab** (MOO-30): a global, read/write view of all mission series (deduplicated by
+  `seriesId`) alongside the day tabs in the parents screen. **"Borrar" means something different
+  there than in a day tab**: `deleteMission` (day view) removes only that day's copy, leaving
+  siblings on other days untouched; `deleteMissionSeries` ("Todo") removes every copy across
+  every day — there's no day of reference in that view, so a partial delete would leave the row
+  looking unchanged (just represented by a different day's copy) with no sign anything happened.
+  Duplicating from "Todo" reuses `duplicateMission` unmodified (it already copies across the
+  source's full `activeDays`, not just one day) — the only wrinkle is computing a valid `dayIdx`
+  argument from a mission with no explicit day context, done via `Math.min(...mission.activeDays)`,
+  which is guaranteed to be the day the representative copy's `id` actually lives on (see
+  `uniqueMissionSeries()` in `src/shared/logic.ts`).
 
 ## Verifying changes
 
