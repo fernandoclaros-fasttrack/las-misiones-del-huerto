@@ -127,6 +127,15 @@ export function MissionCard({
   }
 
   const assignedLabel = assignedToLabel(mission, kids)
+  const activeDaysDescription =
+    mission.activeDays.length === days.length
+      ? 'Todos los días'
+      : mission.activeDays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((i) => days[i]?.label)
+          .filter(Boolean)
+          .join(', ')
 
   return (
     <div style={cardStyle}>
@@ -142,17 +151,18 @@ export function MissionCard({
               {mission.points} pts
             </span>
           </div>
-          <div style={{ display: 'flex', gap: 5, marginTop: 4 }}>
+          <div role="group" aria-label={`Días activos: ${activeDaysDescription}`} style={{ display: 'flex', gap: 5, marginTop: 4 }}>
             {WEEKDAY_INITIALS.map((letter, i) => {
               const on = mission.activeDays.includes(i)
               return (
                 <span
                   key={i}
+                  aria-hidden="true"
                   style={{
                     fontSize: 11,
                     fontWeight: 800,
                     lineHeight: 1,
-                    color: on ? accent : '#D6CBB2',
+                    color: on ? accent : '#8A7C60',
                   }}
                 >
                   {letter}
