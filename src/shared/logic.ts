@@ -156,17 +156,21 @@ export function editMission(
  *  día la copia se inserta justo debajo de la misión original (no al final de la lista),
  *  para que quede visible sin tener que hacer scroll; si ese día tiene un orden manual
  *  (MOO-29) que incluye a la original, la copia se añade justo después en `missionOrder`
- *  también, para conservar esa misma adyacencia. Si la original no está en el orden manual
- *  (cae en el bloque alfabético), no hace falta tocar `missionOrder`: el título de la copia
- *  comparte prefijo con el original, así que el orden alfabético ya las deja juntas. */
+ *  también, para conservar esa misma adyacencia. Lo mismo aplica al orden manual de la vista
+ *  global "Todo" (MOO-30): si `globalMissionOrder` incluye a la serie original, la nueva serie
+ *  se añade justo después ahí también — si no, duplicar una misión en medio de una lista
+ *  reordenada a mano la mandaría al final (bloque alfabético) en vez de quedar junto al
+ *  original. Si la original no está en ninguno de los dos órdenes manuales (cae en el bloque
+ *  alfabético), no hace falta tocarlos: el título de la copia comparte prefijo con el
+ *  original, así que el orden alfabético ya las deja juntas. */
 export function duplicateMission(
   data: FamilyData,
   dayIdx: number,
   missionId: string,
   idSeed: number,
-): { days: Day[]; newMissionId: string | null } {
+): { days: Day[]; globalMissionOrder: string[]; newMissionId: string | null } {
   const source = data.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
-  if (!source) return { days: data.days, newMissionId: null }
+  if (!source) return { days: data.days, globalMissionOrder: data.globalMissionOrder, newMissionId: null }
   const seriesId = `s${idSeed}`
   const title = `${source.title} (copia)`
   const newMissionId = `m${idSeed}-${dayIdx}`
@@ -196,7 +200,12 @@ export function duplicateMission(
         : [...day.missionOrder.slice(0, orderPos + 1), mission.id, ...day.missionOrder.slice(orderPos + 1)]
     return { ...day, missions, missionOrder }
   })
-  return { days, newMissionId }
+  const globalOrderPos = (data.globalMissionOrder ?? []).indexOf(source.seriesId)
+  const globalMissionOrder =
+    globalOrderPos === -1
+      ? data.globalMissionOrder
+      : [...data.globalMissionOrder.slice(0, globalOrderPos + 1), seriesId, ...data.globalMissionOrder.slice(globalOrderPos + 1)]
+  return { days, globalMissionOrder, newMissionId }
 }
 
 /** Borra solo la copia del día indicado. Las copias hermanas (mismo `seriesId`) se
@@ -228,6 +237,30 @@ export function deleteMission(
       missions: d.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, activeDays: mi.activeDays.filter((x) => x !== dayIdx) } : mi)),
     }
   })
+  return { days, acumulado, children }
+}
+
+/** Borra una serie de misión entera (MOO-30): todas sus copias en todos los días, no solo
+ *  la de un día concreto (a diferencia de `deleteMission`). Es lo que "Borrar" tiene que
+ *  significar en la vista global "Todo": esa vista no tiene un día de referencia, así que un
+ *  borrado parcial dejaría la fila viéndose igual (con otra copia como representante) sin dar
+ *  ninguna señal de que "borrar" hizo algo. Ajusta puntos por cada copia que estuviera
+ *  `completada` en su propio día — cada copia tiene su propio estado independiente. */
+export function deleteMissionSeries(data: FamilyData, seriesId: string): Pick<FamilyData, 'days' | 'acumulado' | 'children'> {
+  const hasChildren = data.children.length > 0
+  let acumulado = data.acumulado
+  let children = data.children
+  data.days.forEach((day) => {
+    const mission = day.missions.find((mi) => mi.seriesId === seriesId)
+    if (mission?.status !== 'completada') return
+    if (hasChildren) {
+      const participants = mission.participants.length ? mission.participants : data.children.map((c) => c.id)
+      children = applyParticipantDelta(children, participants, -mission.points)
+    } else {
+      acumulado -= mission.points
+    }
+  })
+  const days = data.days.map((day) => ({ ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }))
   return { days, acumulado, children }
 }
 

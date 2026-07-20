@@ -35,6 +35,7 @@ export default function App() {
     addMission,
     editMission,
     deleteMission,
+    deleteMissionSeries,
     duplicateMission,
     reorderMissions,
     resetMissionOrder,
@@ -266,6 +267,28 @@ export default function App() {
     })
     showToast(`Misión "${mission.title}" duplicada`)
   }
+  async function handleGlobalDeleteMission(mission: Mission) {
+    await deleteMissionSeries(mission.seriesId)
+    if (editingId === mission.id) setEditingId(null)
+  }
+  async function handleGlobalDuplicateMission(mission: Mission) {
+    // Cualquier copia de la serie sirve como referencia para duplicateMission (usa
+    // internamente los días activos de la serie, no solo los del día pasado); el primer día
+    // activo es donde vive exactamente el `id` de esta misión representante — ver
+    // `uniqueMissionSeries()` en logic.ts.
+    const dayIdx = Math.min(...mission.activeDays)
+    const newId = await duplicateMission(dayIdx, mission.id)
+    if (!newId) return
+    setEditingId(newId)
+    setDraft({
+      emoji: mission.emoji,
+      title: `${mission.title} (copia)`,
+      points: mission.points,
+      days: mission.activeDays,
+      assignedTo: mission.assignedTo,
+    })
+    showToast(`Misión "${mission.title}" duplicada`)
+  }
   async function handleReorder(missionIds: string[]) {
     setPendingOrder({ dayIdx: selected, ids: missionIds })
     await reorderMissions(selected, missionIds)
@@ -379,6 +402,8 @@ export default function App() {
               onCancel={cancelEdit}
               onEdit={openEditMission}
               onAdd={openAdd}
+              onDuplicate={(m) => void handleGlobalDuplicateMission(m)}
+              onDelete={(m) => void handleGlobalDeleteMission(m)}
             />
           ) : (
             <>
