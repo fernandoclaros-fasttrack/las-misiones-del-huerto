@@ -229,7 +229,14 @@ export default function App() {
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
-    const activeDays = draft.days.length ? draft.days : [selected]
+    // Si se desmarcan todos los días, hay que decidir un día de respaldo: en la vista por día
+    // se usa el día que se está viendo (`selected`), pero ese mismo valor no tiene relación con
+    // lo que el usuario ve en la vista global "Todo" (puede ser el de hoy, o el último día
+    // visitado) — ahí el respaldo correcto es no tocar los días que ya tenía la misión.
+    const fallbackDays = globalView
+      ? (data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.activeDays ?? [selected])
+      : [selected]
+    const activeDays = draft.days.length ? draft.days : fallbackDays
     if (editingId === 'new') {
       await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays, assignedTo: draft.assignedTo })
     } else if (editingId) {
@@ -260,7 +267,7 @@ export default function App() {
     setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
   }
   async function handleResetOrder() {
-    const alphaIds = [...missions].sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })).map((m) => m.id)
+    const alphaIds = [...missions].sort(byTitle).map((m) => m.id)
     setPendingOrder({ dayIdx: selected, ids: alphaIds })
     await resetMissionOrder(selected)
     setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
