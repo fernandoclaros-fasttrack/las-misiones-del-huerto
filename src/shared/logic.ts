@@ -290,8 +290,57 @@ export function isMissionVisibleTo(mission: Mission, childId: string | null): bo
   return mission.assignedTo.length === 0 || mission.assignedTo.includes(childId)
 }
 
-function byTitle(a: Mission, b: Mission): number {
+export function byTitle(a: Mission, b: Mission): number {
   return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })
+}
+
+/** Etiqueta legible de los días activos de una misión (p. ej. "Lun · Mié" o "Todos los días"). */
+export function activeDaysLabel(mission: Mission, days: Day[]): string {
+  if (mission.activeDays.length === days.length) return 'Todos los días'
+  return mission.activeDays
+    .slice()
+    .sort((a, b) => a - b)
+    .map((i) => days[i]?.short)
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** Etiqueta de a qué hijos está asignada una misión; vacía si es "todos" o hay un solo hijo. */
+export function assignedToLabel(mission: Mission, kids: Child[]): string {
+  if (kids.length <= 1 || mission.assignedTo.length === 0 || mission.assignedTo.length >= kids.length) return ''
+  return ` · ${kids
+    .filter((k) => mission.assignedTo.includes(k.id))
+    .map((k) => k.name)
+    .join(' · ')}`
+}
+
+/** Misiones únicas por `seriesId` (MOO-30): cada serie tiene una copia por día activo en
+ *  `Day.missions`, pero los campos compartidos (título, puntos, emoji, días, asignación) son
+ *  idénticos en todas sus copias, así que basta con quedarse con la primera que aparece. Sin
+ *  ordenar — ver `sortedMissionSeries()` para el orden de visualización de la vista "Todo". */
+export function uniqueMissionSeries(days: Day[]): Mission[] {
+  const bySeriesId = new Map<string, Mission>()
+  days.forEach((day) => {
+    day.missions.forEach((mi) => {
+      if (!bySeriesId.has(mi.seriesId)) bySeriesId.set(mi.seriesId, mi)
+    })
+  })
+  return [...bySeriesId.values()]
+}
+
+/** Orden de visualización de la vista global "Todo" (MOO-30). Mismo criterio que
+ *  `sortedMissions()` para un día, pero a nivel de serie (`globalMissionOrder` guarda
+ *  `seriesId`, no `id` de una copia concreta, porque el `id` de la copia representante de
+ *  cada serie puede cambiar si esa copia deja de estar activa). Vacío = orden alfabético. */
+export function sortedMissionSeries(data: Pick<FamilyData, 'days' | 'globalMissionOrder'>): Mission[] {
+  const unique = uniqueMissionSeries(data.days)
+  const order = data.globalMissionOrder ?? []
+  if (!order.length) return unique.sort(byTitle)
+  const bySeriesId = new Map(unique.map((mi) => [mi.seriesId, mi]))
+  const ordered = order.map((id) => bySeriesId.get(id)).filter((mi): mi is Mission => !!mi)
+  const orderedIds = new Set(ordered.map((mi) => mi.seriesId))
+  const rest = unique.filter((mi) => !orderedIds.has(mi.seriesId)).sort(byTitle)
+  return [...ordered, ...rest]
 }
 
 /** Orden de visualización de las misiones de un día (MOO-29). Si `missionOrder` tiene
@@ -317,6 +366,14 @@ export function reorderMissions(data: FamilyData, dayIdx: number, missionIds: st
 export function resetMissionOrder(data: FamilyData, dayIdx: number): Pick<FamilyData, 'days'> {
   const days = data.days.map((day, di) => (di === dayIdx ? { ...day, missionOrder: [] } : day))
   return { days }
+}
+
+export function reorderGlobalMissions(_data: FamilyData, seriesIds: string[]): Pick<FamilyData, 'globalMissionOrder'> {
+  return { globalMissionOrder: seriesIds }
+}
+
+export function resetGlobalMissionOrder(_data: FamilyData): Pick<FamilyData, 'globalMissionOrder'> {
+  return { globalMissionOrder: [] }
 }
 
 export function totalMissionsDone(day: Day | undefined): number {

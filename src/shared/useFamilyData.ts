@@ -11,15 +11,16 @@ type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
 
 /** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, antes de
  *  MOO-25 sus misiones no tienen `seriesId`/`activeDays`, antes de MOO-26 no tienen
- *  `participants`, antes de MOO-27 no tienen `assignedTo`, y antes de MOO-29 sus días no
- *  tienen `missionOrder` — se normalizan al leer. Cada misión antigua se trata como su propia
- *  serie de un solo día (el día en el que ya vivía), que es exactamente como se comportaba
- *  antes de MOO-25; `participants` vacío se comporta como "todos los hijos", igual que antes
- *  de MOO-26. `assignedTo` que falta se rellena con los IDs de todos los hijos actuales (no
- *  `[]`) para reproducir exactamente el "visible para todos" de antes de MOO-27, incluyendo
- *  hijos añadidos después de que se guardara la misión por última vez. `missionOrder` que
- *  falta se rellena con `[]` (orden alfabético por defecto), igual que el comportamiento
- *  previo a MOO-29. */
+ *  `participants`, antes de MOO-27 no tienen `assignedTo`, antes de MOO-29 sus días no
+ *  tienen `missionOrder`, y antes de MOO-30 el documento no tiene `globalMissionOrder` — se
+ *  normalizan al leer. Cada misión antigua se trata como su propia serie de un solo día (el
+ *  día en el que ya vivía), que es exactamente como se comportaba antes de MOO-25;
+ *  `participants` vacío se comporta como "todos los hijos", igual que antes de MOO-26.
+ *  `assignedTo` que falta se rellena con los IDs de todos los hijos actuales (no `[]`) para
+ *  reproducir exactamente el "visible para todos" de antes de MOO-27, incluyendo hijos
+ *  añadidos después de que se guardara la misión por última vez. `missionOrder`/
+ *  `globalMissionOrder` que faltan se rellenan con `[]` (orden alfabético por defecto), igual
+ *  que el comportamiento previo a MOO-29/MOO-30. */
 function normalize(raw: FamilyData): FamilyData {
   const children = raw.children ?? []
   const days = raw.days.map((day, di) => ({
@@ -33,7 +34,7 @@ function normalize(raw: FamilyData): FamilyData {
       assignedTo: mi.assignedTo ?? children.map((c) => c.id),
     })),
   }))
-  return { ...raw, days, children, redemptions: raw.redemptions ?? [] }
+  return { ...raw, days, children, redemptions: raw.redemptions ?? [], globalMissionOrder: raw.globalMissionOrder ?? [] }
 }
 
 export function useFamilyData() {
@@ -56,7 +57,7 @@ export function useFamilyData() {
       return unsub
     }
     return localStore.subscribe((d) => {
-      setData(d)
+      setData(normalize(d))
       setLoading(false)
     })
   }, [])
@@ -105,6 +106,11 @@ export function useFamilyData() {
 
       resetMissionOrder: (dayIdx: number) =>
         run((d) => ({ patch: logic.resetMissionOrder(d, dayIdx), result: undefined })),
+
+      reorderGlobalMissions: (seriesIds: string[]) =>
+        run((d) => ({ patch: logic.reorderGlobalMissions(d, seriesIds), result: undefined })),
+
+      resetGlobalMissionOrder: () => run((d) => ({ patch: logic.resetGlobalMissionOrder(d), result: undefined })),
 
       setCounter: (value: number) => run((d) => ({ patch: logic.setCounter(d, value), result: undefined })),
 

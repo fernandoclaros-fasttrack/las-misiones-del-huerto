@@ -11,8 +11,9 @@ import { MissionCard } from './components/MissionCard'
 import { MissionsList } from './components/MissionsList'
 import { NewMissionForm } from './components/NewMissionForm'
 import { SettingsMenu } from './components/SettingsMenu'
+import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
-import { sortedMissions } from '../shared/logic'
+import { sortedMissions, sortedMissionSeries, byTitle } from '../shared/logic'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -37,6 +38,8 @@ export default function App() {
     duplicateMission,
     reorderMissions,
     resetMissionOrder,
+    reorderGlobalMissions,
+    resetGlobalMissionOrder,
     setCounter,
     applyPenalty,
     resetCounter,
@@ -52,6 +55,12 @@ export default function App() {
   } = useFamilyData()
 
   const [selected, setSelected] = useState(todayIndex())
+  /** Vista global de misiones (MOO-30): activada desde la pestaña extra "Todo" en `DayTabs`,
+   *  junto a los días de la semana. Alterna el área de misiones entre la vista por día (con
+   *  edición, arrastre, etc.) y una vista de solo lectura con todas las series de misión
+   *  configuradas, independiente del día seleccionado. Es la pestaña seleccionada por defecto
+   *  al abrir el panel de padres. */
+  const [globalView, setGlobalView] = useState(true)
 
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
@@ -72,6 +81,9 @@ export default function App() {
    *  localmente para no dar sensación de que el arrastre "no ha hecho nada". Se descarta en
    *  cuanto la operación se resuelve, momento en el que `data` ya trae el mismo orden. */
   const [pendingOrder, setPendingOrder] = useState<{ dayIdx: number; ids: string[] } | null>(null)
+  /** Igual que `pendingOrder` pero para el orden manual de la vista global "Todo" (MOO-30):
+   *  guarda `seriesId`, no `id` de misión. */
+  const [pendingGlobalOrder, setPendingGlobalOrder] = useState<string[] | null>(null)
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
@@ -124,8 +136,20 @@ export default function App() {
       : rawMissions
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
+  const rawGlobalMissions = sortedMissionSeries(data)
+  const globalMissionsBySeriesId = new Map(rawGlobalMissions.map((m) => [m.seriesId, m]))
+  const globalMissions = pendingGlobalOrder
+    ? pendingGlobalOrder.map((id) => globalMissionsBySeriesId.get(id)).filter((m): m is Mission => !!m)
+    : rawGlobalMissions
+  const hasCustomGlobalOrder = data.globalMissionOrder.length > 0
+
   function selectDay(i: number) {
+    setGlobalView(false)
     setSelected(i)
+    setEditingId(null)
+  }
+  function selectGlobalView() {
+    setGlobalView(true)
     setEditingId(null)
   }
 
@@ -181,7 +205,11 @@ export default function App() {
 
   function openAdd() {
     setEditingId('new')
-    setDraft({ emoji: '🌱', title: '', points: 10, days: [selected], assignedTo: data!.children.map((c) => c.id) })
+    // Desde la vista por día se preselecciona el día que se está viendo (`selected`); desde
+    // "Todo" ese valor no tiene relación con nada que el usuario haya elegido ahí, así que se
+    // preselecciona el día de hoy en su lugar — sigue siendo un punto de partida editable.
+    const days = globalView ? [todayIndex()] : [selected]
+    setDraft({ emoji: '🌱', title: '', points: 10, days, assignedTo: data!.children.map((c) => c.id) })
   }
   function openEditMission(mission: Mission) {
     setEditingId(mission.id)
@@ -205,7 +233,15 @@ export default function App() {
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
-    const activeDays = draft.days.length ? draft.days : [selected]
+    // Si se desmarcan todos los días, hay que decidir un día de respaldo: en la vista por día
+    // se usa el día que se está viendo (`selected`), pero ese mismo valor no tiene relación con
+    // lo que el usuario ve en la vista global "Todo" (puede ser el de hoy, o el último día
+    // visitado) — ahí el respaldo correcto es no tocar los días que ya tenía la misión (o, si es
+    // una misión nueva y por tanto no tiene días previos, el día de hoy).
+    const fallbackDays = globalView
+      ? (data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.activeDays ?? [todayIndex()])
+      : [selected]
+    const activeDays = draft.days.length ? draft.days : fallbackDays
     if (editingId === 'new') {
       await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays, assignedTo: draft.assignedTo })
     } else if (editingId) {
@@ -236,10 +272,23 @@ export default function App() {
     setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
   }
   async function handleResetOrder() {
-    const alphaIds = [...missions].sort((a, b) => a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })).map((m) => m.id)
+    const alphaIds = [...missions].sort(byTitle).map((m) => m.id)
     setPendingOrder({ dayIdx: selected, ids: alphaIds })
     await resetMissionOrder(selected)
     setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
+  }
+  async function handleGlobalReorder(missionIds: string[]) {
+    const idToSeriesId = new Map(globalMissions.map((m) => [m.id, m.seriesId]))
+    const seriesIds = missionIds.map((id) => idToSeriesId.get(id)).filter((id): id is string => !!id)
+    setPendingGlobalOrder(seriesIds)
+    await reorderGlobalMissions(seriesIds)
+    setPendingGlobalOrder((p) => (p === seriesIds ? null : p))
+  }
+  async function handleResetGlobalOrder() {
+    const alphaIds = [...globalMissions].sort(byTitle).map((m) => m.seriesId)
+    setPendingGlobalOrder(alphaIds)
+    await resetGlobalMissionOrder()
+    setPendingGlobalOrder((p) => (p === alphaIds ? null : p))
   }
 
   return (
@@ -296,84 +345,120 @@ export default function App() {
           />
         </div>
 
-        <DayTabs days={data.days} selected={selected} onSelect={selectDay} accent={ACCENT} variant="padres" />
+        <DayTabs
+          days={data.days}
+          selected={selected}
+          onSelect={selectDay}
+          accent={ACCENT}
+          variant="padres"
+          extraTab={{ label: 'Todo', selected: globalView, onSelect: selectGlobalView }}
+        />
 
         <main style={{ flex: 1, padding: '6px 16px 40px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>
-            <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>{day?.label}</span>
-            <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
-          </div>
-
-          {hasCustomOrder && (
-            <button
-              onClick={() => void handleResetOrder()}
-              style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
-            >
-              ↺ Orden alfabético
-            </button>
-          )}
-
-          <MissionsList
-            missions={missions}
-            disabled={editingId !== null}
-            onReorder={(ids) => void handleReorder(ids)}
-            renderItem={(m, dragHandle) => {
-              const editing = editingId === m.id
-              return (
-                <MissionCard
-                  mission={m}
-                  editing={editing}
-                  days={data.days}
-                  kids={data.children}
-                  accent={ACCENT}
-                  dragHandle={dragHandle}
-                  draftEmoji={draft.emoji}
-                  draftTitle={draft.title}
-                  draftPoints={draft.points}
-                  draftDays={draft.days}
-                  draftAssignedTo={draft.assignedTo}
-                  onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                  onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                  onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-                  onToggleDraftDay={toggleDraftDay}
-                  onToggleDraftChild={toggleDraftChild}
-                  onSave={saveMission}
-                  onCancel={cancelEdit}
-                  onEdit={() => openEditMission(m)}
-                  onDuplicate={() => void handleDuplicateMission(m)}
-                  onDelete={() => void handleDeleteMission(m)}
-                />
-              )
-            }}
-          />
-
-          {editingId === 'new' && (
-            <NewMissionForm
+          {globalView ? (
+            <GlobalMissionsView
+              missions={globalMissions}
               days={data.days}
               kids={data.children}
               accent={ACCENT}
-              emoji={draft.emoji}
-              onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-              selectedDays={draft.days}
-              onToggleDay={toggleDraftDay}
-              assignedTo={draft.assignedTo}
-              onToggleChild={toggleDraftChild}
-              title={draft.title}
-              onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-              points={draft.points}
-              onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+              hasCustomOrder={hasCustomGlobalOrder}
+              onReorder={(ids) => void handleGlobalReorder(ids)}
+              onResetOrder={() => void handleResetGlobalOrder()}
+              editingId={editingId}
+              draftEmoji={draft.emoji}
+              draftTitle={draft.title}
+              draftPoints={draft.points}
+              draftDays={draft.days}
+              draftAssignedTo={draft.assignedTo}
+              onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+              onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+              onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+              onToggleDraftDay={toggleDraftDay}
+              onToggleDraftChild={toggleDraftChild}
               onSave={saveMission}
               onCancel={cancelEdit}
+              onEdit={openEditMission}
+              onAdd={openAdd}
             />
-          )}
+          ) : (
+            <>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>
+                <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>{day?.label}</span>
+                <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
+              </div>
 
-          {editingId !== 'new' && (
-            <button
-              onClick={openAdd}
-              style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
-            >
-              ＋ Añadir misión
-            </button>
+              {hasCustomOrder && (
+                <button
+                  onClick={() => void handleResetOrder()}
+                  style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
+                >
+                  ↺ Orden alfabético
+                </button>
+              )}
+
+              <MissionsList
+                missions={missions}
+                disabled={editingId !== null}
+                onReorder={(ids) => void handleReorder(ids)}
+                renderItem={(m, dragHandle) => {
+                  const editing = editingId === m.id
+                  return (
+                    <MissionCard
+                      mission={m}
+                      editing={editing}
+                      days={data.days}
+                      kids={data.children}
+                      accent={ACCENT}
+                      dragHandle={dragHandle}
+                      draftEmoji={draft.emoji}
+                      draftTitle={draft.title}
+                      draftPoints={draft.points}
+                      draftDays={draft.days}
+                      draftAssignedTo={draft.assignedTo}
+                      onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                      onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                      onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                      onToggleDraftDay={toggleDraftDay}
+                      onToggleDraftChild={toggleDraftChild}
+                      onSave={saveMission}
+                      onCancel={cancelEdit}
+                      onEdit={() => openEditMission(m)}
+                      onDuplicate={() => void handleDuplicateMission(m)}
+                      onDelete={() => void handleDeleteMission(m)}
+                    />
+                  )
+                }}
+              />
+
+              {editingId === 'new' && (
+                <NewMissionForm
+                  days={data.days}
+                  kids={data.children}
+                  accent={ACCENT}
+                  emoji={draft.emoji}
+                  onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                  selectedDays={draft.days}
+                  onToggleDay={toggleDraftDay}
+                  assignedTo={draft.assignedTo}
+                  onToggleChild={toggleDraftChild}
+                  title={draft.title}
+                  onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                  points={draft.points}
+                  onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                  onSave={saveMission}
+                  onCancel={cancelEdit}
+                />
+              )}
+
+              {editingId !== 'new' && (
+                <button
+                  onClick={openAdd}
+                  style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+                >
+                  ＋ Añadir misión
+                </button>
+              )}
+            </>
           )}
         </main>
       </div>
