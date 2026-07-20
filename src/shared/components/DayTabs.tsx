@@ -27,6 +27,28 @@ export function DayTabs({ days, selected, onSelect, accent, variant, extraTab }:
 
   return (
     <nav style={{ display: 'flex', gap: 8, overflowX: 'auto', padding: variant === 'ninos' ? '16px 16px 6px' : '8px 16px 6px', flex: '0 0 auto' }}>
+      {extraTab && (
+        <button
+          onClick={extraTab.onSelect}
+          style={{
+            flex: '0 0 auto',
+            minWidth: 54,
+            marginRight: 8,
+            padding: '9px 12px',
+            borderRadius: radius,
+            border: extraTab.selected ? 'none' : `1px solid ${borderColor}`,
+            cursor: 'pointer',
+            fontFamily: "'Nunito', sans-serif",
+            fontWeight: 800,
+            fontSize: 14,
+            background: extraTab.selected ? accent : variant === 'ninos' ? '#FFFDF6' : '#FBF7EC',
+            color: extraTab.selected ? '#F6F1E2' : '#8A7C60',
+            boxShadow: extraTab.selected ? (variant === 'ninos' ? '0 4px 10px rgba(58,50,40,.18)' : '0 4px 10px rgba(58,50,40,.16)') : undefined,
+          }}
+        >
+          {extraTab.label}
+        </button>
+      )}
       {days.map((d, i) => {
         const on = i === selected && !extraTab?.selected
         const isToday = i === today
@@ -76,28 +98,6 @@ export function DayTabs({ days, selected, onSelect, accent, variant, extraTab }:
           </button>
         )
       })}
-      {extraTab && (
-        <button
-          onClick={extraTab.onSelect}
-          style={{
-            flex: '0 0 auto',
-            minWidth: 54,
-            marginLeft: 8,
-            padding: '9px 12px',
-            borderRadius: radius,
-            border: extraTab.selected ? 'none' : `1px solid ${borderColor}`,
-            cursor: 'pointer',
-            fontFamily: "'Nunito', sans-serif",
-            fontWeight: 800,
-            fontSize: 14,
-            background: extraTab.selected ? accent : variant === 'ninos' ? '#FFFDF6' : '#FBF7EC',
-            color: extraTab.selected ? '#F6F1E2' : '#8A7C60',
-            boxShadow: extraTab.selected ? (variant === 'ninos' ? '0 4px 10px rgba(58,50,40,.18)' : '0 4px 10px rgba(58,50,40,.16)') : undefined,
-          }}
-        >
-          {extraTab.label}
-        </button>
-      )}
     </nav>
   )
 }
