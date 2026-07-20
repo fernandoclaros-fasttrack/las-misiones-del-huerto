@@ -56,8 +56,9 @@ export default function App() {
   /** Vista global de misiones (MOO-30): activada desde la pestaña extra "Todo" en `DayTabs`,
    *  junto a los días de la semana. Alterna el área de misiones entre la vista por día (con
    *  edición, arrastre, etc.) y una vista de solo lectura con todas las series de misión
-   *  configuradas, independiente del día seleccionado. */
-  const [globalView, setGlobalView] = useState(false)
+   *  configuradas, independiente del día seleccionado. Es la pestaña seleccionada por defecto
+   *  al abrir el panel de padres. */
+  const [globalView, setGlobalView] = useState(true)
 
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
