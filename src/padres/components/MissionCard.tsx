@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE } from '../../shared/constants'
-import { activeDaysLabel, assignedToLabel } from '../../shared/logic'
+import { EMOJI_PALETTE, WEEKDAY_INITIALS } from '../../shared/constants'
+import { assignedToLabel } from '../../shared/logic'
 import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
@@ -126,8 +126,16 @@ export function MissionCard({
     )
   }
 
-  const daysLabel = activeDaysLabel(mission, days)
   const assignedLabel = assignedToLabel(mission, kids)
+  const activeDaysDescription =
+    mission.activeDays.length === days.length
+      ? 'Todos los días'
+      : mission.activeDays
+          .slice()
+          .sort((a, b) => a - b)
+          .map((i) => days[i]?.label)
+          .filter(Boolean)
+          .join(', ')
 
   return (
     <div style={cardStyle}>
@@ -138,10 +146,52 @@ export function MissionCard({
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
-          <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 700, marginTop: 2 }}>
-            {mission.points} pts · {daysLabel}
-            {assignedLabel}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 5 }}>
+            <div role="group" aria-label={`Días activos: ${activeDaysDescription}`} style={{ display: 'flex', gap: 4 }}>
+              {WEEKDAY_INITIALS.map((letter, i) => {
+                const on = mission.activeDays.includes(i)
+                return (
+                  <span
+                    key={i}
+                    aria-hidden="true"
+                    style={
+                      on
+                        ? {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 16,
+                            height: 16,
+                            borderRadius: '50%',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            lineHeight: 1,
+                            background: accent,
+                            color: '#F6F1E2',
+                          }
+                        : {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: 16,
+                            height: 16,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            lineHeight: 1,
+                            color: '#8A7C60',
+                          }
+                    }
+                  >
+                    {letter}
+                  </span>
+                )
+              })}
+            </div>
+            <span style={{ flex: '0 0 auto', background: '#F1ECDD', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, padding: '3px 10px', borderRadius: 999, whiteSpace: 'nowrap' }}>
+              {mission.points} pts
+            </span>
           </div>
+          {assignedLabel && <div style={{ fontSize: 12, color: '#8A7E6B', fontWeight: 700, marginTop: 3 }}>{assignedLabel}</div>}
         </div>
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>
           ✏️

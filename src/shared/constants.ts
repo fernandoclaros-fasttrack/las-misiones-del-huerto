@@ -3,6 +3,11 @@ import type { Day, FamilyData, MissionStatus, RewardConcept, StatusMeta } from '
 export const ACCENT = '#47702F'
 export const BASE_POINTS_DEFAULT = 40
 
+/** Iniciales de un solo carácter para los días de la semana (Lunes=0..Domingo=6, igual que
+ *  `Mission.activeDays`), usadas en el resumen compacto de una misión. Miércoles usa "X" en
+ *  vez de "M" — si no, coincidiría con Martes; es la abreviatura clásica en español (L-M-X-J-V-S-D). */
+export const WEEKDAY_INITIALS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
+
 export const STATUS_ORDER: MissionStatus[] = ['pendiente', 'progreso', 'bloqueada', 'completada']
 
 export const STATUS_META: Record<MissionStatus, StatusMeta> = {
