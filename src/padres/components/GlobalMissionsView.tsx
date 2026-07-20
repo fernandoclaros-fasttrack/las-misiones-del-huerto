@@ -1,48 +1,108 @@
-import { activeDaysLabel, assignedToLabel } from '../../shared/logic'
+import { MissionCard } from './MissionCard'
+import { MissionsList } from './MissionsList'
 import type { Child, Day, Mission } from '../../shared/types'
 
 interface Props {
   missions: Mission[]
   days: Day[]
   kids: Child[]
+  accent: string
+  hasCustomOrder: boolean
+  onReorder: (missionIds: string[]) => void
+  onResetOrder: () => void
+  editingId: string | null
+  draftEmoji: string
+  draftTitle: string
+  draftPoints: number | string
+  draftDays: number[]
+  draftAssignedTo: string[]
+  onDraftEmojiChange: (emoji: string) => void
+  onDraftTitleChange: (title: string) => void
+  onDraftPointsChange: (points: string) => void
+  onToggleDraftDay: (index: number) => void
+  onToggleDraftChild: (childId: string) => void
+  onSave: () => void
+  onCancel: () => void
+  onEdit: (mission: Mission) => void
 }
 
-/** Vista global de todas las misiones configuradas (MOO-30), de solo lectura: una fila por
- *  serie de misión (deduplicadas por `seriesId` en `uniqueMissionSeries`), ordenadas
- *  alfabéticamente, mostrando en qué día o días aparece cada una. Deliberadamente separada de
- *  la organización día a día (arrastre, edición): para eso se usa la vista por día. */
-export function GlobalMissionsView({ missions, days, kids }: Props) {
+/** Vista global de todas las misiones configuradas (MOO-30): una fila por serie de misión
+ *  (deduplicadas por `seriesId` en `sortedMissionSeries`), con edición y reordenamiento por
+ *  arrastre igual que en la vista por día — reutiliza `MissionCard`/`MissionsList` tal cual.
+ *  Duplicar y borrar quedan fuera: esas acciones operan sobre la copia de un día concreto y
+ *  esta vista no tiene un día de referencia. */
+export function GlobalMissionsView({
+  missions,
+  days,
+  kids,
+  accent,
+  hasCustomOrder,
+  onReorder,
+  onResetOrder,
+  editingId,
+  draftEmoji,
+  draftTitle,
+  draftPoints,
+  draftDays,
+  draftAssignedTo,
+  onDraftEmojiChange,
+  onDraftTitleChange,
+  onDraftPointsChange,
+  onToggleDraftDay,
+  onToggleDraftChild,
+  onSave,
+  onCancel,
+  onEdit,
+}: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>
-        <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>Vista global</span>
+        <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>Todas las misiones</span>
         <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
       </div>
+
+      {hasCustomOrder && (
+        <button
+          onClick={onResetOrder}
+          style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
+        >
+          ↺ Orden alfabético
+        </button>
+      )}
 
       {missions.length === 0 ? (
         <div style={{ padding: '24px 4px', textAlign: 'center', color: '#8A7E6B', fontWeight: 700, fontSize: 14 }}>
           Todavía no hay misiones configuradas.
         </div>
       ) : (
-        missions.map((mission) => (
-          <div
-            key={mission.seriesId}
-            style={{ background: '#FFFDF6', border: '1px solid #EADFCB', borderRadius: 18, padding: '14px 15px', boxShadow: '0 2px 5px rgba(58,50,40,.05)' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: '0 0 auto', width: 46, height: 46, borderRadius: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 25, background: '#F1ECDD' }}>
-                {mission.emoji}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{mission.title}</div>
-                <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 700, marginTop: 2 }}>
-                  {mission.points} pts · {activeDaysLabel(mission, days)}
-                  {assignedToLabel(mission, kids)}
-                </div>
-              </div>
-            </div>
-          </div>
-        ))
+        <MissionsList
+          missions={missions}
+          disabled={editingId !== null}
+          onReorder={onReorder}
+          renderItem={(m, dragHandle) => (
+            <MissionCard
+              mission={m}
+              editing={editingId === m.id}
+              days={days}
+              kids={kids}
+              accent={accent}
+              dragHandle={dragHandle}
+              draftEmoji={draftEmoji}
+              draftTitle={draftTitle}
+              draftPoints={draftPoints}
+              draftDays={draftDays}
+              draftAssignedTo={draftAssignedTo}
+              onDraftEmojiChange={onDraftEmojiChange}
+              onDraftTitleChange={onDraftTitleChange}
+              onDraftPointsChange={onDraftPointsChange}
+              onToggleDraftDay={onToggleDraftDay}
+              onToggleDraftChild={onToggleDraftChild}
+              onSave={onSave}
+              onCancel={onCancel}
+              onEdit={() => onEdit(m)}
+            />
+          )}
+        />
       )}
     </div>
   )

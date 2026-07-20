@@ -112,5 +112,6 @@ export function seedFamilyData(): FamilyData {
     days,
     children: [],
     redemptions: [],
+    globalMissionOrder: [],
   }
 }

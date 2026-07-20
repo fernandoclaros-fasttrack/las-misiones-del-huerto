@@ -66,6 +66,10 @@ export interface FamilyData {
   /** Histórico de canjes por hijo (MOO-22). Solo se generan al canjear puntos de un hijo
    *  concreto (MOO-21); el canje del contador compartido (MOO-11) no genera entradas aquí. */
   redemptions: Redemption[]
+  /** Orden manual de la vista global "Todo" (MOO-30), por `seriesId` (no por `id` de misión,
+   *  que es distinto por copia/día). Vacío = orden alfabético por título, igual criterio que
+   *  `Day.missionOrder` — ver `sortedMissionSeries()` en logic.ts. */
+  globalMissionOrder: string[]
 }
 
 export interface StatusMeta {

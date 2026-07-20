@@ -13,7 +13,7 @@ import { NewMissionForm } from './components/NewMissionForm'
 import { SettingsMenu } from './components/SettingsMenu'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
-import { sortedMissions, uniqueMissionSeries } from '../shared/logic'
+import { sortedMissions, sortedMissionSeries, byTitle } from '../shared/logic'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -38,6 +38,8 @@ export default function App() {
     duplicateMission,
     reorderMissions,
     resetMissionOrder,
+    reorderGlobalMissions,
+    resetGlobalMissionOrder,
     setCounter,
     applyPenalty,
     resetCounter,
@@ -79,6 +81,9 @@ export default function App() {
    *  localmente para no dar sensación de que el arrastre "no ha hecho nada". Se descarta en
    *  cuanto la operación se resuelve, momento en el que `data` ya trae el mismo orden. */
   const [pendingOrder, setPendingOrder] = useState<{ dayIdx: number; ids: string[] } | null>(null)
+  /** Igual que `pendingOrder` pero para el orden manual de la vista global "Todo" (MOO-30):
+   *  guarda `seriesId`, no `id` de misión. */
+  const [pendingGlobalOrder, setPendingGlobalOrder] = useState<string[] | null>(null)
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
@@ -130,6 +135,13 @@ export default function App() {
       ? pendingOrder.ids.map((id) => missionsById.get(id)).filter((m): m is Mission => !!m)
       : rawMissions
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
+
+  const rawGlobalMissions = sortedMissionSeries(data)
+  const globalMissionsBySeriesId = new Map(rawGlobalMissions.map((m) => [m.seriesId, m]))
+  const globalMissions = pendingGlobalOrder
+    ? pendingGlobalOrder.map((id) => globalMissionsBySeriesId.get(id)).filter((m): m is Mission => !!m)
+    : rawGlobalMissions
+  const hasCustomGlobalOrder = data.globalMissionOrder.length > 0
 
   function selectDay(i: number) {
     setGlobalView(false)
@@ -253,6 +265,19 @@ export default function App() {
     await resetMissionOrder(selected)
     setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
   }
+  async function handleGlobalReorder(missionIds: string[]) {
+    const idToSeriesId = new Map(globalMissions.map((m) => [m.id, m.seriesId]))
+    const seriesIds = missionIds.map((id) => idToSeriesId.get(id)).filter((id): id is string => !!id)
+    setPendingGlobalOrder(seriesIds)
+    await reorderGlobalMissions(seriesIds)
+    setPendingGlobalOrder((p) => (p === seriesIds ? null : p))
+  }
+  async function handleResetGlobalOrder() {
+    const alphaIds = [...globalMissions].sort(byTitle).map((m) => m.seriesId)
+    setPendingGlobalOrder(alphaIds)
+    await resetGlobalMissionOrder()
+    setPendingGlobalOrder((p) => (p === alphaIds ? null : p))
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: '#E9E0CC', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
@@ -319,7 +344,29 @@ export default function App() {
 
         <main style={{ flex: 1, padding: '6px 16px 40px', display: 'flex', flexDirection: 'column', gap: 11 }}>
           {globalView ? (
-            <GlobalMissionsView missions={uniqueMissionSeries(data.days)} days={data.days} kids={data.children} />
+            <GlobalMissionsView
+              missions={globalMissions}
+              days={data.days}
+              kids={data.children}
+              accent={ACCENT}
+              hasCustomOrder={hasCustomGlobalOrder}
+              onReorder={(ids) => void handleGlobalReorder(ids)}
+              onResetOrder={() => void handleResetGlobalOrder()}
+              editingId={editingId}
+              draftEmoji={draft.emoji}
+              draftTitle={draft.title}
+              draftPoints={draft.points}
+              draftDays={draft.days}
+              draftAssignedTo={draft.assignedTo}
+              onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+              onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+              onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+              onToggleDraftDay={toggleDraftDay}
+              onToggleDraftChild={toggleDraftChild}
+              onSave={saveMission}
+              onCancel={cancelEdit}
+              onEdit={openEditMission}
+            />
           ) : (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>

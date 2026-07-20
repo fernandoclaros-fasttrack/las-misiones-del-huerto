@@ -28,8 +28,10 @@ interface Props {
   onSave: () => void
   onCancel: () => void
   onEdit: () => void
-  onDuplicate: () => void
-  onDelete: () => void
+  /** Ausentes en la vista global "Todo" (MOO-30): duplicar/borrar operan sobre la copia de un
+   *  día concreto y esa vista no tiene un día de referencia. */
+  onDuplicate?: () => void
+  onDelete?: () => void
 }
 
 export function MissionCard({
@@ -146,12 +148,16 @@ export function MissionCard({
         <button onClick={onEdit} title="Editar" style={ICON_BTN}>
           ✏️
         </button>
-        <button onClick={onDuplicate} title="Duplicar" style={ICON_BTN}>
-          📋
-        </button>
-        <button onClick={onDelete} title="Borrar" style={ICON_BTN}>
-          🗑️
-        </button>
+        {onDuplicate && (
+          <button onClick={onDuplicate} title="Duplicar" style={ICON_BTN}>
+            📋
+          </button>
+        )}
+        {onDelete && (
+          <button onClick={onDelete} title="Borrar" style={ICON_BTN}>
+            🗑️
+          </button>
+        )}
       </div>
     </div>
   )
