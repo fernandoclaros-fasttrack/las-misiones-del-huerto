@@ -57,6 +57,30 @@ export function setMissionStatus(
   return { days, acumulado, children }
 }
 
+/** Delta de puntos que recibiría `childId` (o el contador compartido si es `null`) al pasar una
+ *  misión de su estado actual a `newStatus`, con los participantes `participantIds` (solo
+ *  relevante al completar — mismo criterio que `setMissionStatus`). Se usa tanto para aplicar el
+ *  cambio real como para previsualizarlo (animación en la pantalla de hijos); mantenerlo en un
+ *  único sitio evita que la previsualización y el cambio real diverjan. */
+export function pointsDeltaFor(
+  mission: Mission,
+  newStatus: MissionStatus,
+  participantIds: string[] | undefined,
+  childId: string | null,
+  allChildIds: string[],
+): number {
+  const was = mission.status === 'completada'
+  const now = newStatus === 'completada'
+  if (was === now) return 0
+  if (!childId) return now ? mission.points : -mission.points
+  if (now) {
+    const participants = participantIds?.length ? participantIds : allChildIds
+    return participants.includes(childId) ? mission.points : 0
+  }
+  const participants = mission.participants.length ? mission.participants : allChildIds
+  return participants.includes(childId) ? -mission.points : 0
+}
+
 export interface NewMissionInput {
   emoji: string
   title: string
@@ -270,7 +294,7 @@ export function setCounter(_data: FamilyData, value: number): Pick<FamilyData, '
 
 export function applyPenalty(data: FamilyData, amount: number): Pick<FamilyData, 'acumulado'> {
   const n = Math.max(0, Math.round(amount) || 0)
-  return { acumulado: data.acumulado - n }
+  return { acumulado: Math.max(0, data.acumulado - n) }
 }
 
 /** Resetea la semana entera: contador compartido, puntos por hijo, y el estado de
@@ -426,7 +450,7 @@ export function editChildPoints(data: FamilyData, childId: string, value: number
 
 export function penalizeChild(data: FamilyData, childId: string, amount: number): Pick<FamilyData, 'children'> {
   const n = Math.max(0, Math.round(amount) || 0)
-  return { children: data.children.map((c) => (c.id === childId ? { ...c, points: c.points - n } : c)) }
+  return { children: data.children.map((c) => (c.id === childId ? { ...c, points: Math.max(0, c.points - n) } : c)) }
 }
 
 export interface ChildRedeemResult {

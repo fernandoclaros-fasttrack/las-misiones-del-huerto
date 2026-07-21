@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore'
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
@@ -8,6 +8,16 @@ import * as logic from './logic'
 
 type Patch = Partial<FamilyData> | null
 type Mutator<TResult> = (data: FamilyData) => { patch: Patch; result: TResult }
+
+/** IDs únicos y monótonos para misiones/hijos/conceptos/canjes. Basados en Date.now() (se
+ *  preserva su uso como timestamp de canjes), pero con un contador de respaldo para que dos
+ *  acciones en el mismo milisegundo no generen el mismo ID. */
+let lastId = 0
+function nextId(): number {
+  const now = Date.now()
+  lastId = now > lastId ? now : lastId + 1
+  return lastId
+}
 
 /** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, antes de
  *  MOO-25 sus misiones no tienen `seriesId`/`activeDays`, antes de MOO-26 no tienen
@@ -40,8 +50,6 @@ function normalize(raw: FamilyData): FamilyData {
 export function useFamilyData() {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
-  const dataRef = useRef<FamilyData | null>(null)
-  dataRef.current = data
 
   useEffect(() => {
     if (firebaseEnabled && firestore) {
@@ -75,7 +83,12 @@ export function useFamilyData() {
       })
       return result
     }
-    const current = normalize(dataRef.current ?? localStore.get())
+    // Siempre lee de localStore, no del estado de React (dataRef): localStore.get() es
+    // síncrono y queda al día en cuanto termina un run() anterior, mientras que el estado de
+    // React solo se actualiza en el siguiente render — usarlo aquí podía hacer que dos
+    // acciones seguidas (p. ej. doble click) operasen sobre datos ya obsoletos y una pisara
+    // el efecto de la otra.
+    const current = normalize(localStore.get())
     const { patch, result } = mutator(current)
     if (patch) localStore.set(patch)
     return result
@@ -87,7 +100,7 @@ export function useFamilyData() {
         run((d) => ({ patch: logic.setMissionStatus(d, dayIdx, missionId, status, participantIds), result: undefined })),
 
       addMission: (input: logic.NewMissionInput) =>
-        run((d) => ({ patch: logic.addMission(d, input, Date.now()), result: undefined })),
+        run((d) => ({ patch: logic.addMission(d, input, nextId()), result: undefined })),
 
       editMission: (missionId: string, input: logic.EditMissionInput) =>
         run((d) => ({ patch: logic.editMission(d, missionId, input), result: undefined })),
@@ -100,7 +113,7 @@ export function useFamilyData() {
 
       duplicateMission: (dayIdx: number, missionId: string) =>
         run((d) => {
-          const { days, globalMissionOrder, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, Date.now())
+          const { days, globalMissionOrder, newMissionId } = logic.duplicateMission(d, dayIdx, missionId, nextId())
           return { patch: newMissionId ? { days, globalMissionOrder } : null, result: newMissionId }
         }),
 
@@ -129,14 +142,14 @@ export function useFamilyData() {
 
       addConcept: (concept: { emoji: string; label: string }) =>
         run((d) => {
-          const { concepts, id } = logic.addConcept(d, concept, Date.now())
+          const { concepts, id } = logic.addConcept(d, concept, nextId())
           return { patch: id ? { concepts } : null, result: id }
         }),
 
       removeConcept: (conceptId: string) =>
         run((d) => ({ patch: logic.removeConcept(d, conceptId), result: undefined })),
 
-      addChild: (name: string) => run((d) => ({ patch: logic.addChild(d, name, Date.now()), result: undefined })),
+      addChild: (name: string) => run((d) => ({ patch: logic.addChild(d, name, nextId()), result: undefined })),
 
       renameChild: (childId: string, name: string) =>
         run((d) => ({ patch: logic.renameChild(d, childId, name), result: undefined })),
@@ -151,7 +164,7 @@ export function useFamilyData() {
 
       redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string }) =>
         run((d) => {
-          const r = logic.redeemChildPoints(d, childId, points, concept, Date.now())
+          const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
           return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
         }),
     }),

@@ -290,15 +290,20 @@ export default function App() {
     showToast(`Misión "${mission.title}" duplicada`)
   }
   async function handleReorder(missionIds: string[]) {
-    setPendingOrder({ dayIdx: selected, ids: missionIds })
+    // Compara por identidad de referencia (no por dayIdx) al limpiar, igual que
+    // handleGlobalReorder: si un segundo arrastre empieza en el mismo día antes de que este
+    // termine, la resolución de este no debe borrar el estado optimista del segundo.
+    const pending = { dayIdx: selected, ids: missionIds }
+    setPendingOrder(pending)
     await reorderMissions(selected, missionIds)
-    setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
+    setPendingOrder((p) => (p === pending ? null : p))
   }
   async function handleResetOrder() {
     const alphaIds = [...missions].sort(byTitle).map((m) => m.id)
-    setPendingOrder({ dayIdx: selected, ids: alphaIds })
+    const pending = { dayIdx: selected, ids: alphaIds }
+    setPendingOrder(pending)
     await resetMissionOrder(selected)
-    setPendingOrder((p) => (p?.dayIdx === selected ? null : p))
+    setPendingOrder((p) => (p === pending ? null : p))
   }
   async function handleGlobalReorder(missionIds: string[]) {
     const idToSeriesId = new Map(globalMissions.map((m) => [m.id, m.seriesId]))

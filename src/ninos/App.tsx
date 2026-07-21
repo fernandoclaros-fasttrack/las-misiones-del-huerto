@@ -9,7 +9,7 @@ import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedemptionHistory } from './components/RedemptionHistory'
-import { isMissionVisibleTo, redemptionsForChild, sortedMissions } from '../shared/logic'
+import { isMissionVisibleTo, pointsDeltaFor, redemptionsForChild, sortedMissions } from '../shared/logic'
 import type { Mission, MissionStatus } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
@@ -53,23 +53,10 @@ export default function App() {
   }
 
   function handleSetStatus(mission: Mission, status: MissionStatus, participantIds: string[] | undefined, myChildId: string | null, allChildIds: string[]) {
-    const wasDone = mission.status === 'completada'
-    const nowDone = status === 'completada'
-    if (wasDone !== nowDone) {
-      let myDelta = 0
-      if (!myChildId) {
-        myDelta = nowDone ? mission.points : -mission.points
-      } else if (nowDone) {
-        const participants = participantIds?.length ? participantIds : allChildIds
-        if (participants.includes(myChildId)) myDelta = mission.points
-      } else {
-        const participants = mission.participants.length ? mission.participants : allChildIds
-        if (participants.includes(myChildId)) myDelta = -mission.points
-      }
-      if (myDelta !== 0) {
-        flash(myDelta)
-        setPointsKey((k) => k + 1)
-      }
+    const myDelta = pointsDeltaFor(mission, status, participantIds, myChildId, allChildIds)
+    if (myDelta !== 0) {
+      flash(myDelta)
+      setPointsKey((k) => k + 1)
     }
     void setMissionStatus(selected, mission.id, status, participantIds)
   }
