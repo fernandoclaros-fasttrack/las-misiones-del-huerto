@@ -134,17 +134,7 @@ export function useFamilyData() {
 
       resetGlobalMissionOrder: () => run((d) => ({ patch: logic.resetGlobalMissionOrder(d), result: undefined })),
 
-      setCounter: (value: number) => run((d) => ({ patch: logic.setCounter(d, value), result: undefined })),
-
-      applyPenalty: (amount: number) => run((d) => ({ patch: logic.applyPenalty(d, amount), result: undefined })),
-
       resetCounter: () => run((d) => ({ patch: logic.resetCounter(d), result: undefined })),
-
-      redeemPoints: (points: number) =>
-        run((d) => {
-          const r = logic.redeemPoints(d, points)
-          return { patch: r.ok ? { acumulado: r.acumulado } : null, result: r }
-        }),
 
       addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean }) =>
         run((d) => {

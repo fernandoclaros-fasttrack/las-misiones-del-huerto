@@ -18,14 +18,8 @@ export function btn(bg: string, fg: string, extra?: CSSProperties): CSSPropertie
   }
 }
 
-export const BTN_EDIT = btn('#5A4E3C', '#EFE7CF')
-export const BTN_PENALTY = btn('#5A4E3C', '#EFE7CF')
-export const BTN_REDEEM = btn('#7FB25C', '#22331A')
-export const BTN_RESET = btn('#5A4E3C', '#EFE7CF')
 export const BTN_GO = btn('#7FB25C', '#22331A', { flex: '0 0 auto' })
-export const BTN_GHOST = btn('#5A4E3C', '#D8CDB4', { flex: '0 0 auto' })
 export const BTN_DANGER = btn('#C4664A', '#FBEFE9', { flex: 1 })
-export const BTN_CONFIRM = btn('#7FB25C', '#22331A', { flex: '0 0 auto' })
 export const BTN_MINI = btn('#5A4E3C', '#D8CDB4', { padding: '6px 10px', fontSize: 12 })
 export const BTN_SAVE = btn('#47702F', '#F6F1E2', { flex: 1 })
 export const BTN_CANCEL = btn('#EFE7D4', '#7C6E52', { flex: '0 0 auto', paddingLeft: 16, paddingRight: 16 })
