@@ -44,6 +44,7 @@ export default function App() {
     resetCounter,
     addConcept,
     removeConcept,
+    editConceptCost,
     addChild,
     renameChild,
     removeChild,
@@ -64,6 +65,7 @@ export default function App() {
   const [newConceptLabel, setNewConceptLabel] = useState('')
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
   const [newConceptIsPenalty, setNewConceptIsPenalty] = useState(false)
+  const [newConceptCost, setNewConceptCost] = useState('')
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
@@ -141,10 +143,17 @@ export default function App() {
     setNewConceptLabel('')
     setNewConceptEmoji('🎯')
     setNewConceptIsPenalty(false)
+    setNewConceptCost('')
   }
   async function handleAddConcept() {
     if (!newConceptLabel.trim()) return
-    const id = await addConcept({ emoji: newConceptEmoji, label: newConceptLabel, isPenalty: newConceptIsPenalty })
+    const cost = parseInt(newConceptCost, 10)
+    const id = await addConcept({
+      emoji: newConceptEmoji,
+      label: newConceptLabel,
+      isPenalty: newConceptIsPenalty,
+      cost: Number.isFinite(cost) && cost > 0 ? cost : undefined,
+    })
     if (id) setShowConceptForm(false)
   }
 
@@ -287,7 +296,10 @@ export default function App() {
             onNewConceptEmojiChange={setNewConceptEmoji}
             newConceptIsPenalty={newConceptIsPenalty}
             onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
+            newConceptCost={newConceptCost}
+            onNewConceptCostChange={setNewConceptCost}
             onAddConcept={handleAddConcept}
+            onEditConceptCost={(id, cost) => void editConceptCost(id, cost)}
           />
 
           <ChildrenCard
