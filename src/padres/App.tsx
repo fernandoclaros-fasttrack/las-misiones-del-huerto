@@ -5,7 +5,7 @@ import { LoginScreen } from '../shared/components/LoginScreen'
 import { ACCENT, todayIndex } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { Toast } from '../shared/components/Toast'
-import { CounterCard, type PanelName } from './components/CounterCard'
+import { ConceptsCard } from './components/ConceptsCard'
 import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
 import { MissionsList } from './components/MissionsList'
@@ -41,10 +41,7 @@ export default function App() {
     resetMissionOrder,
     reorderGlobalMissions,
     resetGlobalMissionOrder,
-    setCounter,
-    applyPenalty,
     resetCounter,
-    redeemPoints,
     addConcept,
     removeConcept,
     addChild,
@@ -62,13 +59,6 @@ export default function App() {
    *  al abrir el panel de padres. */
   const [globalView, setGlobalView] = useState(true)
 
-  const [panel, setPanel] = useState<PanelName>(null)
-  const [editVal, setEditVal] = useState('')
-  const [penaltyVal, setPenaltyVal] = useState('')
-  const [redeemVal, setRedeemVal] = useState('')
-  const [redeemMsg, setRedeemMsg] = useState<{ text: string; err: boolean } | null>(null)
-
-  const [redeemConceptId, setRedeemConceptId] = useState<string | null>(null)
   const [showConceptForm, setShowConceptForm] = useState(false)
   const [newConceptLabel, setNewConceptLabel] = useState('')
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
@@ -96,15 +86,6 @@ export default function App() {
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2200)
   }
-
-  // Mantiene el concepto de canje seleccionado válido: por defecto el primero,
-  // y si el seleccionado se borra, cae al siguiente disponible.
-  useEffect(() => {
-    if (!data) return
-    if (!data.concepts.some((c) => c.id === redeemConceptId)) {
-      setRedeemConceptId(data.concepts[0]?.id ?? null)
-    }
-  }, [data, redeemConceptId])
 
   if (!ready) {
     return (
@@ -154,42 +135,6 @@ export default function App() {
     setEditingId(null)
   }
 
-  function openPanel(name: Exclude<PanelName, null>) {
-    setPanel((current) => (current === name ? null : name))
-    setRedeemMsg(null)
-    if (name === 'edit') setEditVal(String(data!.acumulado))
-    if (name === 'penalty') setPenaltyVal('')
-    if (name === 'redeem') setRedeemVal('')
-  }
-  function closePanel() {
-    setPanel(null)
-    setShowConceptForm(false)
-  }
-
-  function saveEdit() {
-    void setCounter(parseInt(editVal, 10) || 0)
-    setPanel(null)
-  }
-  function doApplyPenalty() {
-    void applyPenalty(Math.max(0, parseInt(penaltyVal, 10) || 0))
-    setPanel(null)
-  }
-  function doReset() {
-    void resetCounter()
-    setPanel(null)
-  }
-  async function confirmRedeem() {
-    const pts = parseInt(redeemVal, 10) || 0
-    const result = await redeemPoints(pts)
-    if (!result.ok) {
-      setRedeemMsg({ text: result.error!, err: true })
-      return
-    }
-    const concept = data!.concepts.find((c) => c.id === redeemConceptId)
-    setRedeemVal('')
-    setRedeemMsg({ text: `Canjeados ${pts} pts${concept ? ` por ${concept.label} ${concept.emoji}` : ''}.`, err: false })
-  }
-
   function toggleConceptForm() {
     setShowConceptForm((v) => !v)
     setNewConceptLabel('')
@@ -199,10 +144,7 @@ export default function App() {
   async function handleAddConcept() {
     if (!newConceptLabel.trim()) return
     const id = await addConcept({ emoji: newConceptEmoji, label: newConceptLabel, isPenalty: newConceptIsPenalty })
-    if (id) {
-      setRedeemConceptId(id)
-      setShowConceptForm(false)
-    }
+    if (id) setShowConceptForm(false)
   }
 
   function openAdd() {
@@ -329,25 +271,12 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Bitter', serif", fontWeight: 700, fontSize: 16 }}>🌿 Panel de gestión</div>
             <div style={{ fontSize: 12.5, opacity: 0.82, marginTop: 2, fontWeight: 600 }}>Las misiones del huerto · vista de padres</div>
           </div>
-          <SettingsMenu onBackup={() => downloadBackup(data)} onLogout={() => void logout()} />
+          <SettingsMenu onBackup={() => downloadBackup(data)} onReset={() => void resetCounter()} onLogout={() => void logout()} />
         </header>
 
         <div style={{ padding: '16px 16px 8px' }}>
-          <CounterCard
-            acumulado={data.acumulado}
-            panel={panel}
-            onOpenPanel={openPanel}
-            onClosePanel={closePanel}
-            editVal={editVal}
-            onEditValChange={setEditVal}
-            onSaveEdit={saveEdit}
-            penaltyVal={penaltyVal}
-            onPenaltyValChange={setPenaltyVal}
-            onApplyPenalty={doApplyPenalty}
-            onDoReset={doReset}
+          <ConceptsCard
             concepts={data.concepts}
-            redeemConceptId={redeemConceptId}
-            onSelectConcept={setRedeemConceptId}
             onRemoveConcept={(id) => void removeConcept(id)}
             showConceptForm={showConceptForm}
             onToggleConceptForm={toggleConceptForm}
@@ -358,10 +287,6 @@ export default function App() {
             newConceptIsPenalty={newConceptIsPenalty}
             onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
             onAddConcept={handleAddConcept}
-            redeemVal={redeemVal}
-            onRedeemValChange={setRedeemVal}
-            onConfirmRedeem={confirmRedeem}
-            redeemMsg={redeemMsg}
           />
 
           <ChildrenCard

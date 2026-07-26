@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { BTN_CANCEL, BTN_DANGER } from '../styles'
 
 interface Props {
   onBackup: () => void
+  onReset: () => void
   onLogout: () => void
 }
 
@@ -21,8 +23,9 @@ const ITEM_STYLE = {
   textAlign: 'left' as const,
 }
 
-export function SettingsMenu({ onBackup, onLogout }: Props) {
+export function SettingsMenu({ onBackup, onReset, onLogout }: Props) {
   const [open, setOpen] = useState(false)
+  const [confirmingReset, setConfirmingReset] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -32,6 +35,10 @@ export function SettingsMenu({ onBackup, onLogout }: Props) {
     }
     document.addEventListener('click', onClickOutside)
     return () => document.removeEventListener('click', onClickOutside)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) setConfirmingReset(false)
   }, [open])
 
   return (
@@ -77,6 +84,33 @@ export function SettingsMenu({ onBackup, onLogout }: Props) {
           >
             📥 Copia de seguridad
           </button>
+
+          {confirmingReset ? (
+            <div style={{ padding: '8px 12px' }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3A3228', marginBottom: 8 }}>
+                ¿Resetear la semana? Pone a cero los puntos y todas las misiones.
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => {
+                    onReset()
+                    setOpen(false)
+                  }}
+                  style={BTN_DANGER}
+                >
+                  Sí, resetear
+                </button>
+                <button onClick={() => setConfirmingReset(false)} style={BTN_CANCEL}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingReset(true)} style={ITEM_STYLE}>
+              ↺ Resetear semana
+            </button>
+          )}
+
           <button
             onClick={() => {
               onLogout()

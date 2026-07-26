@@ -8,12 +8,17 @@ for the original design spec (tokens, business rules, data model).
 ## Linear workflow
 
 - Team **Moon**, ticket prefix **MOO**, project "Las misiones del huerto".
-- When implementing a story: move it to **In Progress** when starting, **In Review** once
-  implemented and verified. **Never move a ticket to Done** — only Fernando does that, after
-  personally checking the acceptance criteria. This applies even after verifying the feature
-  live against production Firestore; that verification supports his review, it doesn't replace it.
+- When implementing a story: move it to **In Progress** when starting, then to **In Review**
+  (or "PR Review") once implemented and verified against production — code review only runs
+  once a ticket is in that column. Once code review findings are resolved, move it straight to
+  **Done** yourself; there's no separate step where Fernando has to sign off on the acceptance
+  criteria before Done.
+- Two labels, two different authorities: a technical-readiness label (e.g. "Specs Ready") can
+  be added/removed freely. **"Needs Refinement" is never removed unilaterally** — only Fernando
+  removes it, or explicitly authorizes removing it in the moment, since it encodes whether the
+  product definition itself is settled, not a technical call.
 - Leave a comment on the ticket summarizing what was verified and any judgment calls made
-  resolving ambiguous ACs or Open Questions — his review shouldn't require re-deriving that
+  resolving ambiguous ACs or Open Questions — review shouldn't require re-deriving that
   from the diff.
 - Before building a genuinely new feature, check Linear for existing/related tickets first
   (duplicate detection) rather than assuming a clean slate.

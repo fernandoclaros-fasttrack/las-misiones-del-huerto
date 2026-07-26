@@ -288,15 +288,6 @@ export function deleteMissionSeries(data: FamilyData, seriesId: string): Pick<Fa
   return { days, acumulado, children }
 }
 
-export function setCounter(_data: FamilyData, value: number): Pick<FamilyData, 'acumulado'> {
-  return { acumulado: Math.round(value) || 0 }
-}
-
-export function applyPenalty(data: FamilyData, amount: number): Pick<FamilyData, 'acumulado'> {
-  const n = Math.max(0, Math.round(amount) || 0)
-  return { acumulado: Math.max(0, data.acumulado - n) }
-}
-
 /** Resetea la semana entera: contador compartido, puntos por hijo, y el estado de
  *  todas las misiones (todos los días) vuelven a "pendiente". El histórico de
  *  canjes no se toca: es un registro de eventos pasados, no del estado actual. */
@@ -309,19 +300,6 @@ export function resetCounter(data: FamilyData): Pick<FamilyData, 'acumulado' | '
   }))
   const children = data.children.map((c) => (c.points === 0 ? c : { ...c, points: 0 }))
   return { acumulado: 0, children, days }
-}
-
-export interface RedeemResult {
-  ok: boolean
-  error?: string
-  acumulado?: number
-}
-
-export function redeemPoints(data: FamilyData, points: number): RedeemResult {
-  const pts = Math.round(points) || 0
-  if (pts <= 0) return { ok: false, error: 'Introduce cuántos puntos canjear.' }
-  if (pts > data.acumulado) return { ok: false, error: 'No hay suficientes puntos acumulados.' }
-  return { ok: true, acumulado: data.acumulado - pts }
 }
 
 export function addConcept(
