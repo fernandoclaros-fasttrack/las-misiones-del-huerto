@@ -8,11 +8,12 @@ interface Props {
   floatColor: string
   childName?: string
   onSwitchChild?: () => void
+  onShowRedeem?: () => void
   onShowHistory?: () => void
   onLogout: () => void
 }
 
-export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowHistory, onLogout }: Props) {
+export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowRedeem, onShowHistory, onLogout }: Props) {
   return (
     <header
       style={{
@@ -113,6 +114,26 @@ export function Header({ accent, points, pointsKey, showFloat, floatKey, floatTe
           >
             👤 {childName}
           </button>
+          {onShowRedeem && (
+            <button
+              onClick={onShowRedeem}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 10px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'rgba(255,255,255,.18)',
+                color: '#F6F1E2',
+                fontWeight: 800,
+                fontSize: 12.5,
+                cursor: 'pointer',
+              }}
+            >
+              🛍️ Canjear
+            </button>
+          )}
           {onShowHistory && (
             <button
               onClick={onShowHistory}
