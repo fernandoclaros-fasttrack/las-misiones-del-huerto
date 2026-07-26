@@ -39,9 +39,13 @@ export interface RewardConcept {
   /** Marca el concepto como penalización (MOO-41), para distinguirlo visualmente de una
    *  recompensa en el historial de canjes del hijo/a. */
   isPenalty: boolean
-  /** Coste en puntos configurado para este concepto (MOO-52). Ausente = sin coste configurado
-   *  todavía (conceptos creados antes de MOO-52, o a los que aún no se les ha asignado uno) —
-   *  esos siguen canjeándose con el importe manual, ver `ChildActionsPanel`. */
+  /** Si el concepto pide el importe manualmente en cada canje, en vez de aplicar siempre el
+   *  mismo coste (MOO-54). Ausente = concepto creado antes de MOO-54; se trata como variable o
+   *  fijo según tuviera o no un `cost` configurado — ver `isConceptVariableCost()` en logic.ts,
+   *  que es la única fuente de verdad para esto (no leer este campo directamente). */
+  isVariableCost?: boolean
+  /** Coste en puntos configurado para este concepto (MOO-52). Solo tiene valor cuando el
+   *  concepto es de coste fijo — ver `isConceptVariableCost()`. */
   cost?: number
 }
 

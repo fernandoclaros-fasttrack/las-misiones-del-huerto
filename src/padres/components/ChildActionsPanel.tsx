@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { isConceptVariableCost } from '../../shared/logic'
 import type { Redemption, RewardConcept } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, PANEL_INPUT_STYLE, btn } from '../styles'
 
@@ -41,9 +42,9 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
       setMsg({ text: 'Añade primero un concepto de canje en el contador de arriba.', err: true })
       return
     }
-    // El coste configurado en el concepto (MOO-52) se aplica siempre que exista, sin permitir
-    // ajuste manual — ver el importe libre solo se conserva para conceptos sin coste todavía.
-    const pts = concept.cost ?? (parseInt(redeemVal, 10) || 0)
+    // El coste fijo configurado en el concepto (MOO-52/MOO-54) se aplica siempre, sin permitir
+    // ajuste manual — el importe libre solo se pide para conceptos de coste variable.
+    const pts = isConceptVariableCost(concept) ? parseInt(redeemVal, 10) || 0 : concept.cost ?? 0
     const result = await onRedeem(pts, concept)
     if (!result.ok) {
       setMsg({ text: result.error!, err: true })
@@ -103,13 +104,13 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
                   }}
                 >
                   {c.emoji} {c.label}
-                  {c.cost ? ` · ${c.cost} pts` : ''}
+                  {!isConceptVariableCost(c) ? ` · ${c.cost} pts` : ''}
                 </button>
               )
             })}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            {selectedConcept?.cost ? (
+            {selectedConcept && !isConceptVariableCost(selectedConcept) ? (
               <div style={{ ...PANEL_INPUT_STYLE, display: 'flex', alignItems: 'center' }}>Coste: {selectedConcept.cost} pts</div>
             ) : (
               <input
