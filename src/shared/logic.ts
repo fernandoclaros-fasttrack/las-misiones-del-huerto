@@ -310,11 +310,26 @@ export function addConcept(
   const label = concept.label.trim()
   if (!label) return { concepts: data.concepts, id: null }
   const id = `uc${idSeed}`
-  return { concepts: [...data.concepts, { id, emoji: concept.emoji, label, isPenalty: concept.isPenalty ?? false }], id }
+  const cost = concept.cost && concept.cost > 0 ? Math.round(concept.cost) : undefined
+  const newConcept: RewardConcept = { id, emoji: concept.emoji, label, isPenalty: concept.isPenalty ?? false, ...(cost !== undefined ? { cost } : {}) }
+  return { concepts: [...data.concepts, newConcept], id }
 }
 
 export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyData, 'concepts'> {
   return { concepts: data.concepts.filter((c) => c.id !== conceptId) }
+}
+
+/** Fija o quita (con `cost: null`) el coste en puntos de un concepto ya existente (MOO-52). Un
+ *  coste no positivo se trata igual que quitarlo, no como error, para que borrar el campo del
+ *  input de edición sea la forma natural de dejar el concepto sin coste otra vez. */
+export function editConceptCost(data: FamilyData, conceptId: string, cost: number | null): Pick<FamilyData, 'concepts'> {
+  const normalized = cost !== null && cost > 0 ? Math.round(cost) : undefined
+  const concepts = data.concepts.map((c) => {
+    if (c.id !== conceptId) return c
+    const { cost: _current, ...rest } = c
+    return normalized !== undefined ? { ...rest, cost: normalized } : rest
+  })
+  return { concepts }
 }
 
 /** Si una misión está asignada a un hijo concreto (MOO-27). `assignedTo` vacío significa

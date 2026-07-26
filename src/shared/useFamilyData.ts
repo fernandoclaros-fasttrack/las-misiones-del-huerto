@@ -136,7 +136,7 @@ export function useFamilyData() {
 
       resetCounter: () => run((d) => ({ patch: logic.resetCounter(d), result: undefined })),
 
-      addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean }) =>
+      addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean; cost?: number }) =>
         run((d) => {
           const { concepts, id } = logic.addConcept(d, concept, nextId())
           return { patch: id ? { concepts } : null, result: id }
@@ -144,6 +144,9 @@ export function useFamilyData() {
 
       removeConcept: (conceptId: string) =>
         run((d) => ({ patch: logic.removeConcept(d, conceptId), result: undefined })),
+
+      editConceptCost: (conceptId: string, cost: number | null) =>
+        run((d) => ({ patch: logic.editConceptCost(d, conceptId, cost), result: undefined })),
 
       addChild: (name: string) => run((d) => ({ patch: logic.addChild(d, name, nextId()), result: undefined })),
 

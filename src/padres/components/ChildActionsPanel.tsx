@@ -22,6 +22,7 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
   const [redeemVal, setRedeemVal] = useState('')
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
+  const selectedConcept = concepts.find((c) => c.id === conceptId)
 
   function open(name: Exclude<PanelName, null>) {
     setPanel((cur) => (cur === name ? null : name))
@@ -35,12 +36,14 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
     setPanel(null)
   }
   async function confirmRedeem() {
-    const pts = parseInt(redeemVal, 10) || 0
-    const concept = concepts.find((c) => c.id === conceptId)
+    const concept = selectedConcept
     if (!concept) {
       setMsg({ text: 'Añade primero un concepto de canje en el contador de arriba.', err: true })
       return
     }
+    // El coste configurado en el concepto (MOO-52) se aplica siempre que exista, sin permitir
+    // ajuste manual — ver el importe libre solo se conserva para conceptos sin coste todavía.
+    const pts = concept.cost ?? (parseInt(redeemVal, 10) || 0)
     const result = await onRedeem(pts, concept)
     if (!result.ok) {
       setMsg({ text: result.error!, err: true })
@@ -100,18 +103,23 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
                   }}
                 >
                   {c.emoji} {c.label}
+                  {c.cost ? ` · ${c.cost} pts` : ''}
                 </button>
               )
             })}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="number"
-              value={redeemVal}
-              onChange={(e) => setRedeemVal(e.target.value)}
-              placeholder="puntos"
-              style={PANEL_INPUT_STYLE}
-            />
+            {selectedConcept?.cost ? (
+              <div style={{ ...PANEL_INPUT_STYLE, display: 'flex', alignItems: 'center' }}>Coste: {selectedConcept.cost} pts</div>
+            ) : (
+              <input
+                type="number"
+                value={redeemVal}
+                onChange={(e) => setRedeemVal(e.target.value)}
+                placeholder="puntos"
+                style={PANEL_INPUT_STYLE}
+              />
+            )}
             <button onClick={confirmRedeem} style={BTN_SAVE}>
               Confirmar
             </button>

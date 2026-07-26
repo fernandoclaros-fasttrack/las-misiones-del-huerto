@@ -39,6 +39,10 @@ export interface RewardConcept {
   /** Marca el concepto como penalización (MOO-41), para distinguirlo visualmente de una
    *  recompensa en el historial de canjes del hijo/a. */
   isPenalty: boolean
+  /** Coste en puntos configurado para este concepto (MOO-52). Ausente = sin coste configurado
+   *  todavía (conceptos creados antes de MOO-52, o a los que aún no se les ha asignado uno) —
+   *  esos siguen canjeándose con el importe manual, ver `ChildActionsPanel`. */
+  cost?: number
 }
 
 export interface Child {
