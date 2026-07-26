@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE } from '../../shared/constants'
+import { CONCEPT_EMOJI_PALETTE } from '../../shared/constants'
 import type { RewardConcept } from '../../shared/types'
 import { BTN_GO, BTN_MINI } from '../styles'
 
@@ -122,7 +122,7 @@ export function ConceptsCard(props: Props) {
             style={{ width: '100%', padding: '9px 11px', borderRadius: 9, border: '1px solid #E0D6C2', fontSize: 14, fontWeight: 700, color: '#3A3228' }}
           />
           <div style={{ marginTop: 9 }}>
-            <EmojiPicker options={EMOJI_PALETTE} selected={newConceptEmoji} onSelect={onNewConceptEmojiChange} />
+            <EmojiPicker options={CONCEPT_EMOJI_PALETTE} selected={newConceptEmoji} onSelect={onNewConceptEmojiChange} />
           </div>
           <input
             type="number"

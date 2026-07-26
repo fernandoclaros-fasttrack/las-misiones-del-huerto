@@ -22,6 +22,12 @@ export const EMOJI_PALETTE = [
   '👕', '🐶', '🎒', '♻️', '🍳', '🛁', '🍂', '🛒', '🚗', '📚', '🖊️', '🌻',
 ]
 
+/** Paleta de emojis para conceptos de canje (MOO-53), separada de `EMOJI_PALETTE` porque esta
+ *  es de recompensas (pantallas, chuches, ocio) y esa de tareas domésticas — un concepto de
+ *  canje borrado y recreado (p. ej. 🍦 Postre) necesita su emoji disponible aquí, no en la de
+ *  misiones. */
+export const CONCEPT_EMOJI_PALETTE = ['🎮', '📺', '📱', '🍦', '🎬', '🍿', '🍫', '🎨', '⚽', '🎁']
+
 export const DEFAULT_CONCEPTS: RewardConcept[] = [
   { id: 'c1', emoji: '🎮', label: 'Consola', isPenalty: false },
   { id: 'c2', emoji: '📺', label: 'Tele', isPenalty: false },
