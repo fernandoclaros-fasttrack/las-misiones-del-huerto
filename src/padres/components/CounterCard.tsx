@@ -42,6 +42,8 @@ interface Props {
   onNewConceptLabelChange: (v: string) => void
   newConceptEmoji: string
   onNewConceptEmojiChange: (v: string) => void
+  newConceptIsPenalty: boolean
+  onNewConceptIsPenaltyChange: (v: boolean) => void
   onAddConcept: () => void
   redeemVal: string
   onRedeemValChange: (v: string) => void
@@ -72,6 +74,8 @@ export function CounterCard(props: Props) {
     onNewConceptLabelChange,
     newConceptEmoji,
     onNewConceptEmojiChange,
+    newConceptIsPenalty,
+    onNewConceptIsPenaltyChange,
     onAddConcept,
     redeemVal,
     onRedeemValChange,
@@ -169,14 +173,15 @@ export function CounterCard(props: Props) {
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
             {concepts.map((c) => {
               const active = c.id === redeemConceptId
+              const activeBorder = c.isPenalty ? '#C97A5F' : '#7FB25C'
               return (
                 <button
                   key={c.id}
                   onClick={() => onSelectConcept(c.id)}
                   style={
                     active
-                      ? { display: 'flex', alignItems: 'center', padding: '8px 11px', borderRadius: 11, border: '2px solid #7FB25C', background: '#3B3226', color: '#EFE7CF', cursor: 'pointer' }
-                      : { display: 'flex', alignItems: 'center', padding: '8px 11px', borderRadius: 11, border: '1px solid #6A5E48', background: '#5A4E3C', color: '#D8CDB4', cursor: 'pointer' }
+                      ? { display: 'flex', alignItems: 'center', padding: '8px 11px', borderRadius: 11, border: `2px solid ${activeBorder}`, background: '#3B3226', color: '#EFE7CF', cursor: 'pointer' }
+                      : { display: 'flex', alignItems: 'center', padding: '8px 11px', borderRadius: 11, border: c.isPenalty ? '1px solid #8A5A48' : '1px solid #6A5E48', background: '#5A4E3C', color: '#D8CDB4', cursor: 'pointer' }
                   }
                 >
                   <span>{c.emoji}</span>
@@ -206,6 +211,10 @@ export function CounterCard(props: Props) {
               <div style={{ marginTop: 9 }}>
                 <EmojiPicker options={EMOJI_PALETTE} selected={newConceptEmoji} onSelect={onNewConceptEmojiChange} />
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9, fontSize: 12.5, fontWeight: 700, color: '#D8CDB4', cursor: 'pointer' }}>
+                <input type="checkbox" checked={newConceptIsPenalty} onChange={(e) => onNewConceptIsPenaltyChange(e.target.checked)} />
+                Es una penalización
+              </label>
               <button onClick={onAddConcept} style={{ ...BTN_GO, marginTop: 9, width: '100%' }}>
                 Añadir concepto
               </button>

@@ -326,13 +326,13 @@ export function redeemPoints(data: FamilyData, points: number): RedeemResult {
 
 export function addConcept(
   data: FamilyData,
-  concept: Omit<RewardConcept, 'id'>,
+  concept: Omit<RewardConcept, 'id' | 'isPenalty'> & { isPenalty?: boolean },
   idSeed: number,
 ): { concepts: RewardConcept[]; id: string | null } {
   const label = concept.label.trim()
   if (!label) return { concepts: data.concepts, id: null }
   const id = `uc${idSeed}`
-  return { concepts: [...data.concepts, { id, emoji: concept.emoji, label }], id }
+  return { concepts: [...data.concepts, { id, emoji: concept.emoji, label, isPenalty: concept.isPenalty ?? false }], id }
 }
 
 export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyData, 'concepts'> {
@@ -448,11 +448,6 @@ export function editChildPoints(data: FamilyData, childId: string, value: number
   return { children: data.children.map((c) => (c.id === childId ? { ...c, points } : c)) }
 }
 
-export function penalizeChild(data: FamilyData, childId: string, amount: number): Pick<FamilyData, 'children'> {
-  const n = Math.max(0, Math.round(amount) || 0)
-  return { children: data.children.map((c) => (c.id === childId ? { ...c, points: Math.max(0, c.points - n) } : c)) }
-}
-
 export interface ChildRedeemResult {
   ok: boolean
   error?: string
@@ -464,7 +459,7 @@ export function redeemChildPoints(
   data: FamilyData,
   childId: string,
   points: number,
-  concept: { emoji: string; label: string },
+  concept: { emoji: string; label: string; isPenalty?: boolean },
   idSeed: number,
 ): ChildRedeemResult {
   const pts = Math.round(points) || 0
@@ -479,6 +474,7 @@ export function redeemChildPoints(
     points: pts,
     conceptEmoji: concept.emoji,
     conceptLabel: concept.label,
+    isPenalty: concept.isPenalty ?? false,
     timestamp: idSeed,
   }
   return { ok: true, children, redemptions: [...data.redemptions, redemption] }

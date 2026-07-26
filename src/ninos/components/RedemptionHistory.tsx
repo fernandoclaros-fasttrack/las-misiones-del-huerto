@@ -65,7 +65,16 @@ export function RedemptionHistory({ redemptions, onBack }: Props) {
               <div style={{ fontWeight: 700, fontSize: 15 }}>{r.conceptLabel}</div>
               <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 600 }}>{new Date(r.timestamp).toLocaleDateString('es-ES')}</div>
             </div>
-            <div style={{ background: '#E5EFD6', color: '#40682A', fontWeight: 800, fontSize: 13, padding: '5px 10px', borderRadius: 999 }}>
+            <div
+              style={{
+                background: r.isPenalty ? '#F6DCD3' : '#E5EFD6',
+                color: r.isPenalty ? '#A0402A' : '#40682A',
+                fontWeight: 800,
+                fontSize: 13,
+                padding: '5px 10px',
+                borderRadius: 999,
+              }}
+            >
               −{r.points} pts
             </div>
           </div>

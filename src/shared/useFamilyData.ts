@@ -30,7 +30,10 @@ function nextId(): number {
  *  reproducir exactamente el "visible para todos" de antes de MOO-27, incluyendo hijos
  *  añadidos después de que se guardara la misión por última vez. `missionOrder`/
  *  `globalMissionOrder` que faltan se rellenan con `[]` (orden alfabético por defecto), igual
- *  que el comportamiento previo a MOO-29/MOO-30. */
+ *  que el comportamiento previo a MOO-29/MOO-30. Conceptos/canjes guardados antes de MOO-41 no
+ *  tienen `isPenalty` — se infiere de la etiqueta (contiene "penaliz") en vez de asumir `false`,
+ *  para que un concepto de penalización creado a mano antes de esta funcionalidad (y sus canjes
+ *  ya registrados) se sigan mostrando en rojo sin que el padre/madre tenga que recrearlo. */
 function normalize(raw: FamilyData): FamilyData {
   const children = raw.children ?? []
   const days = raw.days.map((day, di) => ({
@@ -44,7 +47,10 @@ function normalize(raw: FamilyData): FamilyData {
       assignedTo: mi.assignedTo ?? children.map((c) => c.id),
     })),
   }))
-  return { ...raw, days, children, redemptions: raw.redemptions ?? [], globalMissionOrder: raw.globalMissionOrder ?? [] }
+  const looksLikePenalty = (label: string) => /penaliz/i.test(label)
+  const concepts = (raw.concepts ?? []).map((c) => ({ ...c, isPenalty: c.isPenalty ?? looksLikePenalty(c.label) }))
+  const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
+  return { ...raw, days, children, concepts, redemptions, globalMissionOrder: raw.globalMissionOrder ?? [] }
 }
 
 export function useFamilyData() {
@@ -140,7 +146,7 @@ export function useFamilyData() {
           return { patch: r.ok ? { acumulado: r.acumulado } : null, result: r }
         }),
 
-      addConcept: (concept: { emoji: string; label: string }) =>
+      addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean }) =>
         run((d) => {
           const { concepts, id } = logic.addConcept(d, concept, nextId())
           return { patch: id ? { concepts } : null, result: id }
@@ -159,10 +165,7 @@ export function useFamilyData() {
       editChildPoints: (childId: string, value: number) =>
         run((d) => ({ patch: logic.editChildPoints(d, childId, value), result: undefined })),
 
-      penalizeChild: (childId: string, amount: number) =>
-        run((d) => ({ patch: logic.penalizeChild(d, childId, amount), result: undefined })),
-
-      redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string }) =>
+      redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string; isPenalty?: boolean }) =>
         run((d) => {
           const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
           return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }

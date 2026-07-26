@@ -51,7 +51,6 @@ export default function App() {
     renameChild,
     removeChild,
     editChildPoints,
-    penalizeChild,
     redeemChildPoints,
   } = useFamilyData()
 
@@ -73,6 +72,7 @@ export default function App() {
   const [showConceptForm, setShowConceptForm] = useState(false)
   const [newConceptLabel, setNewConceptLabel] = useState('')
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
+  const [newConceptIsPenalty, setNewConceptIsPenalty] = useState(false)
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
@@ -194,10 +194,11 @@ export default function App() {
     setShowConceptForm((v) => !v)
     setNewConceptLabel('')
     setNewConceptEmoji('🎯')
+    setNewConceptIsPenalty(false)
   }
   async function handleAddConcept() {
     if (!newConceptLabel.trim()) return
-    const id = await addConcept({ emoji: newConceptEmoji, label: newConceptLabel })
+    const id = await addConcept({ emoji: newConceptEmoji, label: newConceptLabel, isPenalty: newConceptIsPenalty })
     if (id) {
       setRedeemConceptId(id)
       setShowConceptForm(false)
@@ -354,6 +355,8 @@ export default function App() {
             onNewConceptLabelChange={setNewConceptLabel}
             newConceptEmoji={newConceptEmoji}
             onNewConceptEmojiChange={setNewConceptEmoji}
+            newConceptIsPenalty={newConceptIsPenalty}
+            onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
             onAddConcept={handleAddConcept}
             redeemVal={redeemVal}
             onRedeemValChange={setRedeemVal}
@@ -368,7 +371,6 @@ export default function App() {
             onRename={(id, name) => void renameChild(id, name)}
             onRemove={(id) => void removeChild(id)}
             onEditPoints={(id, value) => void editChildPoints(id, value)}
-            onPenalize={(id, amount) => void penalizeChild(id, amount)}
             onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
           />
         </div>
