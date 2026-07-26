@@ -23,10 +23,10 @@ export const EMOJI_PALETTE = [
 ]
 
 export const DEFAULT_CONCEPTS: RewardConcept[] = [
-  { id: 'c1', emoji: '🎮', label: 'Consola' },
-  { id: 'c2', emoji: '📺', label: 'Tele' },
-  { id: 'c3', emoji: '📱', label: 'Tablet' },
-  { id: 'c4', emoji: '🍦', label: 'Postre' },
+  { id: 'c1', emoji: '🎮', label: 'Consola', isPenalty: false },
+  { id: 'c2', emoji: '📺', label: 'Tele', isPenalty: false },
+  { id: 'c3', emoji: '📱', label: 'Tablet', isPenalty: false },
+  { id: 'c4', emoji: '🍦', label: 'Postre', isPenalty: false },
 ]
 
 /** Índice de hoy en la semana, con Lunes = 0 ... Domingo = 6. */

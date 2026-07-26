@@ -36,6 +36,9 @@ export interface RewardConcept {
   id: string
   emoji: string
   label: string
+  /** Marca el concepto como penalización (MOO-41), para distinguirlo visualmente de una
+   *  recompensa en el historial de canjes del hijo/a. */
+  isPenalty: boolean
 }
 
 export interface Child {
@@ -50,6 +53,9 @@ export interface Redemption {
   points: number
   conceptEmoji: string
   conceptLabel: string
+  /** Copiado de `RewardConcept.isPenalty` en el momento del canje (MOO-41), para que el
+   *  historial pueda mostrar las penalizaciones en rojo aunque el concepto cambie después. */
+  isPenalty: boolean
   /** epoch ms */
   timestamp: number
 }

@@ -10,11 +10,10 @@ interface Props {
   onRename: (childId: string, name: string) => void
   onRemove: (childId: string) => void
   onEditPoints: (childId: string, value: number) => void
-  onPenalize: (childId: string, amount: number) => void
   onRedeem: (childId: string, points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function ChildrenCard({ kids, concepts, onAdd, onRename, onRemove, onEditPoints, onPenalize, onRedeem }: Props) {
+export function ChildrenCard({ kids, concepts, onAdd, onRename, onRemove, onEditPoints, onRedeem }: Props) {
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draftName, setDraftName] = useState('')
 
@@ -80,7 +79,6 @@ export function ChildrenCard({ kids, concepts, onAdd, onRename, onRemove, onEdit
                 currentPoints={child.points}
                 concepts={concepts}
                 onEditPoints={(value) => onEditPoints(child.id, value)}
-                onPenalize={(amount) => onPenalize(child.id, amount)}
                 onRedeem={(points, concept) => onRedeem(child.id, points, concept)}
               />
             </div>

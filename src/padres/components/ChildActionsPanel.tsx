@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { RewardConcept } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, PANEL_INPUT_STYLE, btn } from '../styles'
 
-type PanelName = null | 'edit' | 'penalty' | 'redeem'
+type PanelName = null | 'edit' | 'redeem'
 
 const BTN_LIGHT = btn('#F1ECDD', '#6E6045', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
 const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
@@ -11,14 +11,12 @@ interface Props {
   currentPoints: number
   concepts: RewardConcept[]
   onEditPoints: (value: number) => void
-  onPenalize: (amount: number) => void
   onRedeem: (points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
 }
 
-export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onPenalize, onRedeem }: Props) {
+export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onRedeem }: Props) {
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
-  const [penaltyVal, setPenaltyVal] = useState('')
   const [redeemVal, setRedeemVal] = useState('')
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
@@ -27,16 +25,11 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onPen
     setPanel((cur) => (cur === name ? null : name))
     setMsg(null)
     if (name === 'edit') setEditVal(String(currentPoints))
-    if (name === 'penalty') setPenaltyVal('')
     if (name === 'redeem') setRedeemVal('')
   }
 
   function saveEdit() {
     onEditPoints(parseInt(editVal, 10) || 0)
-    setPanel(null)
-  }
-  function applyPenalty() {
-    onPenalize(Math.max(0, parseInt(penaltyVal, 10) || 0))
     setPanel(null)
   }
   async function confirmRedeem() {
@@ -61,9 +54,6 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onPen
         <button onClick={() => open('edit')} style={BTN_LIGHT}>
           ✏️ Editar
         </button>
-        <button onClick={() => open('penalty')} style={BTN_LIGHT}>
-          ➖ Penalizar
-        </button>
         <button onClick={() => open('redeem')} style={BTN_LIGHT_GREEN}>
           🎁 Canjear
         </button>
@@ -83,31 +73,12 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onPen
         </div>
       )}
 
-      {panel === 'penalty' && (
-        <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10 }}>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              type="number"
-              value={penaltyVal}
-              onChange={(e) => setPenaltyVal(e.target.value)}
-              placeholder="p. ej. 15"
-              style={PANEL_INPUT_STYLE}
-            />
-            <button onClick={applyPenalty} style={BTN_SAVE}>
-              Aplicar
-            </button>
-            <button onClick={() => setPanel(null)} style={BTN_CANCEL}>
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
       {panel === 'redeem' && (
         <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {concepts.map((c) => {
               const active = c.id === conceptId
+              const activeColor = c.isPenalty ? '#A04A32' : '#5B8C3E'
               return (
                 <button
                   key={c.id}
@@ -115,8 +86,8 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onPen
                   style={{
                     padding: '6px 10px',
                     borderRadius: 10,
-                    border: active ? '2px solid #5B8C3E' : '1px solid #E4DBC8',
-                    background: active ? '#DDEBC9' : '#FFFDF6',
+                    border: active ? `2px solid ${activeColor}` : c.isPenalty ? '1px solid #E3B8AA' : '1px solid #E4DBC8',
+                    background: active ? (c.isPenalty ? '#F3DCD3' : '#DDEBC9') : '#FFFDF6',
                     color: '#3A3228',
                     fontWeight: 700,
                     fontSize: 12.5,
