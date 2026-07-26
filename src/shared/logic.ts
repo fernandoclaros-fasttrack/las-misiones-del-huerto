@@ -458,6 +458,16 @@ export function redeemChildPoints(
   return { ok: true, children, redemptions: [...data.redemptions, redemption] }
 }
 
-export function redemptionsForChild(data: FamilyData, childId: string): Redemption[] {
-  return data.redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
+export function redemptionsForChild(redemptions: Redemption[], childId: string): Redemption[] {
+  return redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
+}
+
+/** Borra una entrada del historial de canjes (MOO-44) y devuelve sus puntos al hijo, para
+ *  poder corregir un canje registrado por error sin afectar al resto del historial. */
+export function deleteRedemption(data: FamilyData, redemptionId: string): Pick<FamilyData, 'children' | 'redemptions'> {
+  const redemption = data.redemptions.find((r) => r.id === redemptionId)
+  if (!redemption) return { children: data.children, redemptions: data.redemptions }
+  const children = data.children.map((c) => (c.id === redemption.childId ? { ...c, points: c.points + redemption.points } : c))
+  const redemptions = data.redemptions.filter((r) => r.id !== redemptionId)
+  return { children, redemptions }
 }

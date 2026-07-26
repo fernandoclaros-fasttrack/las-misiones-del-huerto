@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import type { RewardConcept } from '../../shared/types'
+import type { Redemption, RewardConcept } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, PANEL_INPUT_STYLE, btn } from '../styles'
 
-type PanelName = null | 'edit' | 'redeem'
+type PanelName = null | 'edit' | 'redeem' | 'history'
 
 const BTN_LIGHT = btn('#F1ECDD', '#6E6045', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
 const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
@@ -10,11 +10,13 @@ const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px',
 interface Props {
   currentPoints: number
   concepts: RewardConcept[]
+  redemptions: Redemption[]
   onEditPoints: (value: number) => void
   onRedeem: (points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
+  onDeleteRedemption: (redemptionId: string) => void
 }
 
-export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onRedeem }: Props) {
+export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEditPoints, onRedeem, onDeleteRedemption }: Props) {
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
   const [redeemVal, setRedeemVal] = useState('')
@@ -56,6 +58,9 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onRed
         </button>
         <button onClick={() => open('redeem')} style={BTN_LIGHT_GREEN}>
           🎁 Canjear
+        </button>
+        <button onClick={() => open('history')} style={BTN_LIGHT}>
+          🧾 Historial
         </button>
       </div>
 
@@ -112,6 +117,40 @@ export function ChildActionsPanel({ currentPoints, concepts, onEditPoints, onRed
             </button>
           </div>
           {msg && <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: msg.err ? '#A04A32' : '#3F6B26' }}>{msg.text}</div>}
+        </div>
+      )}
+
+      {panel === 'history' && (
+        <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {redemptions.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 600, textAlign: 'center', padding: '4px 0' }}>Sin canjes todavía.</div>
+          ) : (
+            redemptions.map((r) => (
+              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 17 }}>{r.conceptEmoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13 }}>{r.conceptLabel}</div>
+                  <div style={{ fontSize: 11.5, color: '#8A7E6B', fontWeight: 600 }}>{new Date(r.timestamp).toLocaleDateString('es-ES')}</div>
+                </div>
+                <span
+                  style={{
+                    background: r.isPenalty ? '#F6DCD3' : '#E5EFD6',
+                    color: r.isPenalty ? '#A0402A' : '#40682A',
+                    fontWeight: 800,
+                    fontSize: 12,
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  −{r.points} pts
+                </span>
+                <button onClick={() => onDeleteRedemption(r.id)} title="Eliminar canje" style={{ ...BTN_LIGHT, flex: '0 0 auto', padding: '6px 8px' }}>
+                  🗑️
+                </button>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>

@@ -49,6 +49,7 @@ export default function App() {
     removeChild,
     editChildPoints,
     redeemChildPoints,
+    deleteRedemption,
   } = useFamilyData()
 
   const [selected, setSelected] = useState(todayIndex())
@@ -292,11 +293,13 @@ export default function App() {
           <ChildrenCard
             kids={data.children}
             concepts={data.concepts}
+            redemptions={data.redemptions}
             onAdd={(name) => void addChild(name)}
             onRename={(id, name) => void renameChild(id, name)}
             onRemove={(id) => void removeChild(id)}
             onEditPoints={(id, value) => void editChildPoints(id, value)}
             onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
+            onDeleteRedemption={(id) => void deleteRedemption(id)}
           />
         </div>
 

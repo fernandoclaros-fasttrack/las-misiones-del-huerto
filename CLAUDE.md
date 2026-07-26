@@ -23,6 +23,17 @@ for the original design spec (tokens, business rules, data model).
 - Before building a genuinely new feature, check Linear for existing/related tickets first
   (duplicate detection) rather than assuming a clean slate.
 
+## Merging
+
+Once a ticket has passed code review and is Done, merge it without stopping to ask for manual
+confirmation: commit on the ticket's feature branch (matching Linear's `gitBranchName`), push,
+open a PR (short summary + test plan), then merge and delete the branch, then switch local back
+to `main` and pull. This includes pushing to `main`, which auto-triggers a production deploy —
+that's expected and fine here, not a reason to pause. This is deliberately looser than the
+general default caution around production-deploying merges: Fernando has said this app is for
+himself and his kids, not a business serving live customers, so asking every time is friction
+without a matching risk reduction.
+
 ## Architecture decisions that aren't obvious from the code
 
 - **Shared counter vs per-child points**: `FamilyData.acumulado` is the original v1 shared
