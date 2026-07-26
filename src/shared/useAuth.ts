@@ -15,13 +15,17 @@ export function useAuth() {
   const [ready, setReady] = useState(!firebaseEnabled)
 
   useEffect(() => {
-    if (!firebaseEnabled || !auth) return
-    return onAuthStateChanged(auth, (u) => {
+    // `auth` es un binding mutable de módulo (podría ser reasignado en teoría), así que TS no
+    // deja que su narrowing (!auth) sobreviva dentro del closure de onAuthStateChanged — de ahí
+    // esta const local, que sí queda narrowed de forma estable.
+    const currentAuth = auth
+    if (!firebaseEnabled || !currentAuth) return
+    return onAuthStateChanged(currentAuth, (u) => {
       if (!u && DEV_AUTH_PASSWORD) {
         // Si VITE_DEV_AUTH_PASSWORD es incorrecta esto falla y no vuelve a disparar
         // onAuthStateChanged — sin el catch, ready se quedaría en false para siempre y la app no
         // saldría nunca de "Cargando…". Al fallar, se cae a la pantalla de login normal.
-        signInWithEmailAndPassword(auth, AUTH_EMAIL, DEV_AUTH_PASSWORD).catch(() => {
+        signInWithEmailAndPassword(currentAuth, AUTH_EMAIL, DEV_AUTH_PASSWORD).catch(() => {
           setUser(null)
           setReady(true)
         })
