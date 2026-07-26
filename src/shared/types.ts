@@ -68,6 +68,20 @@ export interface Redemption {
   timestamp: number
 }
 
+/** Quién realizó una acción registrada en `FamilyData.changeLog` (MOO-39): la pantalla de
+ *  hijos solo puede completar/descompletar misiones, todo lo demás sale de la de padres — no
+ *  hay una identidad por persona (login es una única contraseña compartida, ver MOO-24). */
+export type ChangeActor = 'padre' | 'hijo'
+
+export interface ChangeLogEntry {
+  id: string
+  actor: ChangeActor
+  /** Texto ya listo para mostrar (qué pasó), en español. */
+  description: string
+  /** epoch ms */
+  timestamp: number
+}
+
 export interface FamilyData {
   basePoints: number
   /** Contador compartido heredado (v1). Se mantiene mientras no haya hijos configurados;
@@ -84,6 +98,11 @@ export interface FamilyData {
    *  que es distinto por copia/día). Vacío = orden alfabético por título, igual criterio que
    *  `Day.missionOrder` — ver `sortedMissionSeries()` en logic.ts. */
   globalMissionOrder: string[]
+  /** Historial de acciones que afectan a los puntos acumulados (MOO-39), sin importar si
+   *  vienen de una misión, un canje, una penalización o una edición manual — a diferencia de
+   *  `redemptions`, que solo cubre canjes. Se genera en `useFamilyData.ts` (no en `logic.ts`,
+   *  que se mantiene puro), comparando el total de puntos antes/después de cada acción. */
+  changeLog: ChangeLogEntry[]
 }
 
 export interface StatusMeta {

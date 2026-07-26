@@ -3,7 +3,7 @@ import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore'
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData } from './constants'
-import type { FamilyData, MissionStatus } from './types'
+import type { ChangeActor, FamilyData, MissionStatus } from './types'
 import * as logic from './logic'
 
 type Patch = Partial<FamilyData> | null
@@ -50,10 +50,44 @@ function normalize(raw: FamilyData): FamilyData {
   const looksLikePenalty = (label: string) => /penaliz/i.test(label)
   const concepts = (raw.concepts ?? []).map((c) => ({ ...c, isPenalty: c.isPenalty ?? looksLikePenalty(c.label) }))
   const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
-  return { ...raw, days, children, concepts, redemptions, globalMissionOrder: raw.globalMissionOrder ?? [] }
+  return { ...raw, days, children, concepts, redemptions, globalMissionOrder: raw.globalMissionOrder ?? [], changeLog: raw.changeLog ?? [] }
 }
 
-export function useFamilyData() {
+/** Puntos totales en juego (contador compartido + puntos por hijo). Comparar este valor
+ *  antes/después de una acción es cómo `withHistory` decide, de forma genérica y sin tener
+ *  que enumerar casos en cada punto de llamada, si esa acción es "significativa" para el
+ *  historial (MOO-39): la pregunta abierta del ticket la resolvió como "cualquier acción que
+ *  afecte a los puntos acumulados", y ese total es exactamente eso. */
+function totalPoints(d: Pick<FamilyData, 'acumulado' | 'children'>): number {
+  return d.acumulado + d.children.reduce((sum, c) => sum + c.points, 0)
+}
+
+/** Envuelve un `Mutator` para registrar una entrada de `changeLog` (MOO-39) cuando, y solo
+ *  cuando, la acción cambia el total de puntos en juego — así `logic.ts` no necesita saber
+ *  nada de historial (se queda puro) y no hay que decidir caso a caso en cada acción si
+ *  "cuenta" como significativa. `describe` recibe los datos *antes* de la mutación (para poder
+ *  leer, por ejemplo, el título de una misión que el patch está a punto de borrar) y puede
+ *  devolver `null` para no registrar nada aunque el total cambie (no debería hacer falta con
+ *  las acciones actuales, pero deja la puerta abierta sin forzar un registro). */
+function withHistory<TResult>(
+  actor: ChangeActor,
+  mutator: Mutator<TResult>,
+  describe: (data: FamilyData, result: TResult) => string | null,
+): Mutator<TResult> {
+  return (data) => {
+    const { patch, result } = mutator(data)
+    if (!patch) return { patch, result }
+    const after = { acumulado: patch.acumulado ?? data.acumulado, children: patch.children ?? data.children }
+    if (totalPoints(after) === totalPoints(data)) return { patch, result }
+    const description = describe(data, result)
+    if (!description) return { patch, result }
+    const id = nextId()
+    const entry = { id: `chg${id}`, actor, description, timestamp: id }
+    return { patch: { ...patch, changeLog: [...data.changeLog, entry] }, result }
+  }
+}
+
+export function useFamilyData(actor: ChangeActor) {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -103,19 +137,56 @@ export function useFamilyData() {
   const actions = useMemo(
     () => ({
       setMissionStatus: (dayIdx: number, missionId: string, status: MissionStatus, participantIds?: string[]) =>
-        run((d) => ({ patch: logic.setMissionStatus(d, dayIdx, missionId, status, participantIds), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.setMissionStatus(d, dayIdx, missionId, status, participantIds), result: undefined }),
+            (d) => {
+              const mission = d.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
+              if (!mission) return null
+              return mission.status === 'completada' ? `Descompletó la misión "${mission.title}"` : `Completó la misión "${mission.title}"`
+            },
+          ),
+        ),
 
       addMission: (input: logic.NewMissionInput) =>
         run((d) => ({ patch: logic.addMission(d, input, nextId()), result: undefined })),
 
       editMission: (missionId: string, input: logic.EditMissionInput) =>
-        run((d) => ({ patch: logic.editMission(d, missionId, input), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.editMission(d, missionId, input), result: undefined }),
+            (d) => {
+              const existing = d.days.flatMap((day) => day.missions).find((mi) => mi.id === missionId)
+              return existing ? `Editó los puntos de la misión "${input.title.trim() || existing.title}"` : null
+            },
+          ),
+        ),
 
       deleteMission: (dayIdx: number, missionId: string) =>
-        run((d) => ({ patch: logic.deleteMission(d, dayIdx, missionId), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.deleteMission(d, dayIdx, missionId), result: undefined }),
+            (d) => {
+              const mission = d.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
+              return mission ? `Borró la misión completada "${mission.title}"` : null
+            },
+          ),
+        ),
 
       deleteMissionSeries: (seriesId: string) =>
-        run((d) => ({ patch: logic.deleteMissionSeries(d, seriesId), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.deleteMissionSeries(d, seriesId), result: undefined }),
+            (d) => {
+              const mission = logic.uniqueMissionSeries(d.days).find((mi) => mi.seriesId === seriesId)
+              return mission ? `Borró la misión completada "${mission.title}" (todos los días)` : null
+            },
+          ),
+        ),
 
       duplicateMission: (dayIdx: number, missionId: string) =>
         run((d) => {
@@ -134,7 +205,8 @@ export function useFamilyData() {
 
       resetGlobalMissionOrder: () => run((d) => ({ patch: logic.resetGlobalMissionOrder(d), result: undefined })),
 
-      resetCounter: () => run((d) => ({ patch: logic.resetCounter(d), result: undefined })),
+      resetCounter: () =>
+        run(withHistory(actor, (d) => ({ patch: logic.resetCounter(d), result: undefined }), () => 'Reseteó la semana (puntos y misiones a cero)')),
 
       addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean; isVariableCost: boolean; cost?: number }) =>
         run((d) => {
@@ -153,21 +225,62 @@ export function useFamilyData() {
       renameChild: (childId: string, name: string) =>
         run((d) => ({ patch: logic.renameChild(d, childId, name), result: undefined })),
 
-      removeChild: (childId: string) => run((d) => ({ patch: logic.removeChild(d, childId), result: undefined })),
+      removeChild: (childId: string) =>
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.removeChild(d, childId), result: undefined }),
+            (d) => {
+              const child = d.children.find((c) => c.id === childId)
+              return child ? `Eliminó a ${child.name} de la familia (perdió ${child.points} pts)` : null
+            },
+          ),
+        ),
 
       editChildPoints: (childId: string, value: number) =>
-        run((d) => ({ patch: logic.editChildPoints(d, childId, value), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.editChildPoints(d, childId, value), result: undefined }),
+            (d) => {
+              const child = d.children.find((c) => c.id === childId)
+              return child ? `Editó los puntos de ${child.name} (${child.points} → ${Math.round(value) || 0})` : null
+            },
+          ),
+        ),
 
       redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string; isPenalty?: boolean }) =>
-        run((d) => {
-          const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
-          return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
-        }),
+        run(
+          withHistory(
+            actor,
+            (d) => {
+              const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
+              return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
+            },
+            (d) => {
+              const child = d.children.find((c) => c.id === childId)
+              if (!child) return null
+              const verb = concept.isPenalty ? 'Aplicó una penalización a' : 'Canjeó puntos de'
+              return `${verb} ${child.name}: ${concept.emoji} ${concept.label} (${Math.round(points) || 0} pts)`
+            },
+          ),
+        ),
 
       deleteRedemption: (redemptionId: string) =>
-        run((d) => ({ patch: logic.deleteRedemption(d, redemptionId), result: undefined })),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.deleteRedemption(d, redemptionId), result: undefined }),
+            (d) => {
+              const redemption = d.redemptions.find((r) => r.id === redemptionId)
+              if (!redemption) return null
+              const child = d.children.find((c) => c.id === redemption.childId)
+              return `Eliminó un canje${child ? ` de ${child.name}` : ''}: ${redemption.conceptEmoji} ${redemption.conceptLabel}`
+            },
+          ),
+        ),
     }),
-    [run],
+    [run, actor],
   )
 
   return { data, loading, ...actions }

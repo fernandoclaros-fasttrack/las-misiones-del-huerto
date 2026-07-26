@@ -11,6 +11,7 @@ import { MissionCard } from './components/MissionCard'
 import { MissionsList } from './components/MissionsList'
 import { NewMissionForm } from './components/NewMissionForm'
 import { SettingsMenu } from './components/SettingsMenu'
+import { ChangeHistoryView } from './components/ChangeHistoryView'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
 import { sortedMissions, sortedMissionSeries, byTitle } from '../shared/logic'
@@ -51,9 +52,10 @@ export default function App() {
     editChildPoints,
     redeemChildPoints,
     deleteRedemption,
-  } = useFamilyData()
+  } = useFamilyData('padre')
 
   const [selected, setSelected] = useState(todayIndex())
+  const [showHistory, setShowHistory] = useState(false)
   /** Vista global de misiones (MOO-30): activada desde la pestaña extra "Todo" en `DayTabs`,
    *  junto a los días de la semana. Alterna el área de misiones entre la vista por día (con
    *  edición, arrastre, etc.) y una vista de solo lectura con todas las series de misión
@@ -284,160 +286,171 @@ export default function App() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: "'Bitter', serif", fontWeight: 700, fontSize: 16 }}>🌿 Panel de gestión</div>
             <div style={{ fontSize: 12.5, opacity: 0.82, marginTop: 2, fontWeight: 600 }}>Las misiones del huerto · vista de padres</div>
           </div>
-          <SettingsMenu onBackup={() => downloadBackup(data)} onReset={() => void resetCounter()} onLogout={() => void logout()} />
+          <SettingsMenu
+            onBackup={() => downloadBackup(data)}
+            onHistory={() => setShowHistory(true)}
+            onReset={() => void resetCounter()}
+            onLogout={() => void logout()}
+          />
         </header>
 
-        <div style={{ padding: '16px 16px 8px' }}>
-          <ConceptsCard
-            concepts={data.concepts}
-            onRemoveConcept={(id) => void removeConcept(id)}
-            showConceptForm={showConceptForm}
-            onToggleConceptForm={toggleConceptForm}
-            newConceptLabel={newConceptLabel}
-            onNewConceptLabelChange={setNewConceptLabel}
-            newConceptEmoji={newConceptEmoji}
-            onNewConceptEmojiChange={setNewConceptEmoji}
-            newConceptIsPenalty={newConceptIsPenalty}
-            onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
-            newConceptIsVariableCost={newConceptIsVariableCost}
-            onNewConceptIsVariableCostChange={setNewConceptIsVariableCost}
-            newConceptCost={newConceptCost}
-            onNewConceptCostChange={setNewConceptCost}
-            onAddConcept={handleAddConcept}
-            onEditConcept={(id, changes) => void editConcept(id, changes)}
-          />
-
-          <ChildrenCard
-            kids={data.children}
-            concepts={data.concepts}
-            redemptions={data.redemptions}
-            onAdd={(name) => void addChild(name)}
-            onRename={(id, name) => void renameChild(id, name)}
-            onRemove={(id) => void removeChild(id)}
-            onEditPoints={(id, value) => void editChildPoints(id, value)}
-            onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
-            onDeleteRedemption={(id) => void deleteRedemption(id)}
-          />
-        </div>
-
-        <DayTabs
-          days={data.days}
-          selected={selected}
-          onSelect={selectDay}
-          accent={ACCENT}
-          variant="padres"
-          extraTab={{ label: 'Todo', selected: globalView, onSelect: selectGlobalView }}
-        />
-
-        <main style={{ flex: 1, padding: '6px 16px 40px', display: 'flex', flexDirection: 'column', gap: 11 }}>
-          {globalView ? (
-            <GlobalMissionsView
-              missions={globalMissions}
-              days={data.days}
-              kids={data.children}
-              accent={ACCENT}
-              hasCustomOrder={hasCustomGlobalOrder}
-              onReorder={(ids) => void handleGlobalReorder(ids)}
-              onResetOrder={() => void handleResetGlobalOrder()}
-              editingId={editingId}
-              draftEmoji={draft.emoji}
-              draftTitle={draft.title}
-              draftPoints={draft.points}
-              draftDays={draft.days}
-              draftAssignedTo={draft.assignedTo}
-              onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-              onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-              onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-              onToggleDraftDay={toggleDraftDay}
-              onToggleDraftChild={toggleDraftChild}
-              onSave={saveMission}
-              onCancel={cancelEdit}
-              onEdit={openEditMission}
-              onAdd={openAdd}
-              onDuplicate={(m) => void handleGlobalDuplicateMission(m)}
-              onDelete={(m) => void handleGlobalDeleteMission(m)}
-            />
-          ) : (
-            <>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>
-                <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>{day?.label}</span>
-                <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
-              </div>
-
-              {hasCustomOrder && (
-                <button
-                  onClick={() => void handleResetOrder()}
-                  style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
-                >
-                  ↺ Orden alfabético
-                </button>
-              )}
-
-              <MissionsList
-                missions={missions}
-                disabled={editingId !== null}
-                onReorder={(ids) => void handleReorder(ids)}
-                renderItem={(m, dragHandle) => {
-                  const editing = editingId === m.id
-                  return (
-                    <MissionCard
-                      mission={m}
-                      editing={editing}
-                      days={data.days}
-                      kids={data.children}
-                      accent={ACCENT}
-                      dragHandle={dragHandle}
-                      draftEmoji={draft.emoji}
-                      draftTitle={draft.title}
-                      draftPoints={draft.points}
-                      draftDays={draft.days}
-                      draftAssignedTo={draft.assignedTo}
-                      onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                      onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                      onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-                      onToggleDraftDay={toggleDraftDay}
-                      onToggleDraftChild={toggleDraftChild}
-                      onSave={saveMission}
-                      onCancel={cancelEdit}
-                      onEdit={() => openEditMission(m)}
-                      onDuplicate={() => void handleDuplicateMission(m)}
-                      onDelete={() => void handleDeleteMission(m)}
-                    />
-                  )
-                }}
+        {showHistory ? (
+          <ChangeHistoryView entries={data.changeLog} onBack={() => setShowHistory(false)} />
+        ) : (
+          <>
+            <div style={{ padding: '16px 16px 8px' }}>
+              <ConceptsCard
+                concepts={data.concepts}
+                onRemoveConcept={(id) => void removeConcept(id)}
+                showConceptForm={showConceptForm}
+                onToggleConceptForm={toggleConceptForm}
+                newConceptLabel={newConceptLabel}
+                onNewConceptLabelChange={setNewConceptLabel}
+                newConceptEmoji={newConceptEmoji}
+                onNewConceptEmojiChange={setNewConceptEmoji}
+                newConceptIsPenalty={newConceptIsPenalty}
+                onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
+                newConceptIsVariableCost={newConceptIsVariableCost}
+                onNewConceptIsVariableCostChange={setNewConceptIsVariableCost}
+                newConceptCost={newConceptCost}
+                onNewConceptCostChange={setNewConceptCost}
+                onAddConcept={handleAddConcept}
+                onEditConcept={(id, changes) => void editConcept(id, changes)}
               />
 
-              {editingId === 'new' && (
-                <NewMissionForm
+              <ChildrenCard
+                kids={data.children}
+                concepts={data.concepts}
+                redemptions={data.redemptions}
+                onAdd={(name) => void addChild(name)}
+                onRename={(id, name) => void renameChild(id, name)}
+                onRemove={(id) => void removeChild(id)}
+                onEditPoints={(id, value) => void editChildPoints(id, value)}
+                onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
+                onDeleteRedemption={(id) => void deleteRedemption(id)}
+              />
+            </div>
+
+            <DayTabs
+              days={data.days}
+              selected={selected}
+              onSelect={selectDay}
+              accent={ACCENT}
+              variant="padres"
+              extraTab={{ label: 'Todo', selected: globalView, onSelect: selectGlobalView }}
+            />
+
+            <main style={{ flex: 1, padding: '6px 16px 40px', display: 'flex', flexDirection: 'column', gap: 11 }}>
+              {globalView ? (
+                <GlobalMissionsView
+                  missions={globalMissions}
                   days={data.days}
                   kids={data.children}
                   accent={ACCENT}
-                  emoji={draft.emoji}
-                  onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                  selectedDays={draft.days}
-                  onToggleDay={toggleDraftDay}
-                  assignedTo={draft.assignedTo}
-                  onToggleChild={toggleDraftChild}
-                  title={draft.title}
-                  onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                  points={draft.points}
-                  onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                  hasCustomOrder={hasCustomGlobalOrder}
+                  onReorder={(ids) => void handleGlobalReorder(ids)}
+                  onResetOrder={() => void handleResetGlobalOrder()}
+                  editingId={editingId}
+                  draftEmoji={draft.emoji}
+                  draftTitle={draft.title}
+                  draftPoints={draft.points}
+                  draftDays={draft.days}
+                  draftAssignedTo={draft.assignedTo}
+                  onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                  onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                  onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                  onToggleDraftDay={toggleDraftDay}
+                  onToggleDraftChild={toggleDraftChild}
                   onSave={saveMission}
                   onCancel={cancelEdit}
+                  onEdit={openEditMission}
+                  onAdd={openAdd}
+                  onDuplicate={(m) => void handleGlobalDuplicateMission(m)}
+                  onDelete={(m) => void handleGlobalDeleteMission(m)}
                 />
-              )}
+              ) : (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 4px 2px' }}>
+                    <span style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 18 }}>{day?.label}</span>
+                    <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
+                  </div>
 
-              {editingId !== 'new' && (
-                <button
-                  onClick={openAdd}
-                  style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
-                >
-                  ＋ Añadir misión
-                </button>
+                  {hasCustomOrder && (
+                    <button
+                      onClick={() => void handleResetOrder()}
+                      style={{ alignSelf: 'flex-end', margin: '-5px 4px 2px 0', border: 'none', background: 'transparent', color: '#7C6E52', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', padding: 0 }}
+                    >
+                      ↺ Orden alfabético
+                    </button>
+                  )}
+
+                  <MissionsList
+                    missions={missions}
+                    disabled={editingId !== null}
+                    onReorder={(ids) => void handleReorder(ids)}
+                    renderItem={(m, dragHandle) => {
+                      const editing = editingId === m.id
+                      return (
+                        <MissionCard
+                          mission={m}
+                          editing={editing}
+                          days={data.days}
+                          kids={data.children}
+                          accent={ACCENT}
+                          dragHandle={dragHandle}
+                          draftEmoji={draft.emoji}
+                          draftTitle={draft.title}
+                          draftPoints={draft.points}
+                          draftDays={draft.days}
+                          draftAssignedTo={draft.assignedTo}
+                          onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                          onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                          onDraftPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                          onToggleDraftDay={toggleDraftDay}
+                          onToggleDraftChild={toggleDraftChild}
+                          onSave={saveMission}
+                          onCancel={cancelEdit}
+                          onEdit={() => openEditMission(m)}
+                          onDuplicate={() => void handleDuplicateMission(m)}
+                          onDelete={() => void handleDeleteMission(m)}
+                        />
+                      )
+                    }}
+                  />
+
+                  {editingId === 'new' && (
+                    <NewMissionForm
+                      days={data.days}
+                      kids={data.children}
+                      accent={ACCENT}
+                      emoji={draft.emoji}
+                      onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                      selectedDays={draft.days}
+                      onToggleDay={toggleDraftDay}
+                      assignedTo={draft.assignedTo}
+                      onToggleChild={toggleDraftChild}
+                      title={draft.title}
+                      onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                      points={draft.points}
+                      onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                      onSave={saveMission}
+                      onCancel={cancelEdit}
+                    />
+                  )}
+
+                  {editingId !== 'new' && (
+                    <button
+                      onClick={openAdd}
+                      style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+                    >
+                      ＋ Añadir misión
+                    </button>
+                  )}
+                </>
               )}
-            </>
-          )}
-        </main>
+            </main>
+          </>
+        )}
       </div>
     </div>
   )

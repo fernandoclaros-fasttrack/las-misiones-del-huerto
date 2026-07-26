@@ -3,6 +3,7 @@ import { BTN_CANCEL, BTN_DANGER } from '../styles'
 
 interface Props {
   onBackup: () => void
+  onHistory: () => void
   onReset: () => void
   onLogout: () => void
 }
@@ -23,7 +24,7 @@ const ITEM_STYLE = {
   textAlign: 'left' as const,
 }
 
-export function SettingsMenu({ onBackup, onReset, onLogout }: Props) {
+export function SettingsMenu({ onBackup, onHistory, onReset, onLogout }: Props) {
   const [open, setOpen] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -83,6 +84,16 @@ export function SettingsMenu({ onBackup, onReset, onLogout }: Props) {
             style={ITEM_STYLE}
           >
             📥 Copia de seguridad
+          </button>
+
+          <button
+            onClick={() => {
+              onHistory()
+              setOpen(false)
+            }}
+            style={ITEM_STYLE}
+          >
+            🧾 Historial de cambios
           </button>
 
           {confirmingReset ? (

@@ -18,7 +18,7 @@ const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
 
 export default function App() {
   const { ready, isAuthed, login, logout, resetPassword } = useAuth()
-  const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData()
+  const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo')
   const [selected, setSelected] = useState(todayIndex())
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
   const [screen, setScreen] = useState<'missions' | 'history' | 'redeem'>('missions')
