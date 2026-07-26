@@ -44,7 +44,7 @@ export default function App() {
     resetCounter,
     addConcept,
     removeConcept,
-    editConceptCost,
+    editConcept,
     addChild,
     renameChild,
     removeChild,
@@ -65,6 +65,7 @@ export default function App() {
   const [newConceptLabel, setNewConceptLabel] = useState('')
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
   const [newConceptIsPenalty, setNewConceptIsPenalty] = useState(false)
+  const [newConceptIsVariableCost, setNewConceptIsVariableCost] = useState(false)
   const [newConceptCost, setNewConceptCost] = useState('')
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
@@ -143,6 +144,7 @@ export default function App() {
     setNewConceptLabel('')
     setNewConceptEmoji('🎯')
     setNewConceptIsPenalty(false)
+    setNewConceptIsVariableCost(false)
     setNewConceptCost('')
   }
   async function handleAddConcept() {
@@ -152,6 +154,7 @@ export default function App() {
       emoji: newConceptEmoji,
       label: newConceptLabel,
       isPenalty: newConceptIsPenalty,
+      isVariableCost: newConceptIsVariableCost,
       cost: Number.isFinite(cost) && cost > 0 ? cost : undefined,
     })
     if (id) setShowConceptForm(false)
@@ -296,10 +299,12 @@ export default function App() {
             onNewConceptEmojiChange={setNewConceptEmoji}
             newConceptIsPenalty={newConceptIsPenalty}
             onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
+            newConceptIsVariableCost={newConceptIsVariableCost}
+            onNewConceptIsVariableCostChange={setNewConceptIsVariableCost}
             newConceptCost={newConceptCost}
             onNewConceptCostChange={setNewConceptCost}
             onAddConcept={handleAddConcept}
-            onEditConceptCost={(id, cost) => void editConceptCost(id, cost)}
+            onEditConcept={(id, changes) => void editConcept(id, changes)}
           />
 
           <ChildrenCard

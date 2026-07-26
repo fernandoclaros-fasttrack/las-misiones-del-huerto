@@ -302,16 +302,36 @@ export function resetCounter(data: FamilyData): Pick<FamilyData, 'acumulado' | '
   return { acumulado: 0, children, days }
 }
 
+/** Si un concepto de canje pide el importe manualmente en cada canje, en vez de aplicar siempre
+ *  el mismo coste (MOO-54). Única fuente de verdad para esta distinción — no leer `cost` ni
+ *  `isVariableCost` directamente fuera de aquí. Conceptos creados antes de MOO-54 no tienen
+ *  `isVariableCost` explícito: se tratan como coste variable si nunca tuvieron un `cost`
+ *  configurado (comportamiento previo a esta funcionalidad), o como coste fijo si ya lo tenían
+ *  (MOO-52), sin que haga falta editarlos manualmente. */
+export function isConceptVariableCost(concept: RewardConcept): boolean {
+  return concept.isVariableCost ?? concept.cost === undefined
+}
+
 export function addConcept(
   data: FamilyData,
-  concept: Omit<RewardConcept, 'id' | 'isPenalty'> & { isPenalty?: boolean },
+  concept: Omit<RewardConcept, 'id' | 'isPenalty' | 'isVariableCost'> & { isPenalty?: boolean; isVariableCost: boolean },
   idSeed: number,
 ): { concepts: RewardConcept[]; id: string | null } {
   const label = concept.label.trim()
   if (!label) return { concepts: data.concepts, id: null }
-  const id = `uc${idSeed}`
   const cost = concept.cost && concept.cost > 0 ? Math.round(concept.cost) : undefined
-  const newConcept: RewardConcept = { id, emoji: concept.emoji, label, isPenalty: concept.isPenalty ?? false, ...(cost !== undefined ? { cost } : {}) }
+  // Un concepto de coste fijo necesita un coste válido para poder crearse; uno de coste
+  // variable nunca guarda un coste, aunque se hubiera introducido algo en ese campo.
+  if (!concept.isVariableCost && cost === undefined) return { concepts: data.concepts, id: null }
+  const id = `uc${idSeed}`
+  const newConcept: RewardConcept = {
+    id,
+    emoji: concept.emoji,
+    label,
+    isPenalty: concept.isPenalty ?? false,
+    isVariableCost: concept.isVariableCost ?? false,
+    ...(concept.isVariableCost ? {} : { cost }),
+  }
   return { concepts: [...data.concepts, newConcept], id }
 }
 
@@ -319,16 +339,23 @@ export function removeConcept(data: FamilyData, conceptId: string): Pick<FamilyD
   return { concepts: data.concepts.filter((c) => c.id !== conceptId) }
 }
 
-/** Fija o quita (con `cost: null`) el coste en puntos de un concepto ya existente (MOO-52). Un
- *  coste no positivo se trata igual que quitarlo, no como error, para que borrar el campo del
- *  input de edición sea la forma natural de dejar el concepto sin coste otra vez. */
-export function editConceptCost(data: FamilyData, conceptId: string, cost: number | null): Pick<FamilyData, 'concepts'> {
-  const normalized = cost !== null && cost > 0 ? Math.round(cost) : undefined
-  const concepts = data.concepts.map((c) => {
-    if (c.id !== conceptId) return c
-    const { cost: _current, ...rest } = c
-    return normalized !== undefined ? { ...rest, cost: normalized } : rest
-  })
+/** Edita el tipo de coste (fijo/variable) y, si es fijo, su valor en puntos (MOO-54). Un
+ *  concepto de coste fijo necesita un coste válido (> 0) para poder guardarse — si no lo tiene,
+ *  la edición se descarta y el concepto se queda como estaba, en vez de guardarse en un estado
+ *  inválido. Al convertir a coste variable, el coste fijo anterior se conserva (aunque deje de
+ *  aplicarse) en vez de descartarse, precisamente para que sea distinguible de "nunca tuvo uno"
+ *  y se pueda recuperar sin volver a escribirlo si el concepto vuelve a convertirse en fijo —
+ *  es la razón de fondo por la que este campo es explícito y no solo inferido de `cost`. */
+export function editConcept(
+  data: FamilyData,
+  conceptId: string,
+  changes: { isVariableCost: boolean; cost: number | null },
+): Pick<FamilyData, 'concepts'> {
+  const cost = changes.cost !== null && changes.cost > 0 ? Math.round(changes.cost) : undefined
+  if (!changes.isVariableCost && cost === undefined) return { concepts: data.concepts }
+  const concepts = data.concepts.map((c) =>
+    c.id === conceptId ? (changes.isVariableCost ? { ...c, isVariableCost: true } : { ...c, isVariableCost: false, cost: cost! }) : c,
+  )
   return { concepts }
 }
 
