@@ -140,7 +140,7 @@ export default function App() {
         />
 
         {hasChildren && showHistory && activeChild ? (
-          <RedemptionHistory redemptions={redemptionsForChild(data, activeChild.id)} onBack={() => setShowHistory(false)} />
+          <RedemptionHistory redemptions={redemptionsForChild(data.redemptions, activeChild.id)} onBack={() => setShowHistory(false)} />
         ) : (
           <>
             <DayTabs days={data.days} selected={selected} onSelect={setSelected} accent={ACCENT} variant="ninos" />

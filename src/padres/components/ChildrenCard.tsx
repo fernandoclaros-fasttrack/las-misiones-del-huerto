@@ -1,19 +1,22 @@
 import { useState } from 'react'
-import type { Child, RewardConcept } from '../../shared/types'
+import type { Child, Redemption, RewardConcept } from '../../shared/types'
+import { redemptionsForChild } from '../../shared/logic'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE } from '../styles'
 import { ChildActionsPanel } from './ChildActionsPanel'
 
 interface Props {
   kids: Child[]
   concepts: RewardConcept[]
+  redemptions: Redemption[]
   onAdd: (name: string) => void
   onRename: (childId: string, name: string) => void
   onRemove: (childId: string) => void
   onEditPoints: (childId: string, value: number) => void
   onRedeem: (childId: string, points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
+  onDeleteRedemption: (redemptionId: string) => void
 }
 
-export function ChildrenCard({ kids, concepts, onAdd, onRename, onRemove, onEditPoints, onRedeem }: Props) {
+export function ChildrenCard({ kids, concepts, redemptions, onAdd, onRename, onRemove, onEditPoints, onRedeem, onDeleteRedemption }: Props) {
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draftName, setDraftName] = useState('')
 
@@ -78,8 +81,10 @@ export function ChildrenCard({ kids, concepts, onAdd, onRename, onRemove, onEdit
               <ChildActionsPanel
                 currentPoints={child.points}
                 concepts={concepts}
+                redemptions={redemptionsForChild(redemptions, child.id)}
                 onEditPoints={(value) => onEditPoints(child.id, value)}
                 onRedeem={(points, concept) => onRedeem(child.id, points, concept)}
+                onDeleteRedemption={onDeleteRedemption}
               />
             </div>
           ),

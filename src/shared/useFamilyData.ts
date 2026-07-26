@@ -160,6 +160,9 @@ export function useFamilyData() {
           const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
           return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
         }),
+
+      deleteRedemption: (redemptionId: string) =>
+        run((d) => ({ patch: logic.deleteRedemption(d, redemptionId), result: undefined })),
     }),
     [run],
   )
