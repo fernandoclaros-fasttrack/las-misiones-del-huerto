@@ -375,6 +375,33 @@ export default function App() {
                     <span style={{ fontSize: 13, color: '#8A7E6B', fontWeight: 700 }}>{missions.length} misiones</span>
                   </div>
 
+                  {editingId === 'new' ? (
+                    <NewMissionForm
+                      days={data.days}
+                      kids={data.children}
+                      accent={ACCENT}
+                      emoji={draft.emoji}
+                      onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                      selectedDays={draft.days}
+                      onToggleDay={toggleDraftDay}
+                      assignedTo={draft.assignedTo}
+                      onToggleChild={toggleDraftChild}
+                      title={draft.title}
+                      onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                      points={draft.points}
+                      onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                      onSave={saveMission}
+                      onCancel={cancelEdit}
+                    />
+                  ) : (
+                    <button
+                      onClick={openAdd}
+                      style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
+                    >
+                      ＋ Añadir misión
+                    </button>
+                  )}
+
                   {hasCustomOrder && (
                     <button
                       onClick={() => void handleResetOrder()}
@@ -417,35 +444,6 @@ export default function App() {
                       )
                     }}
                   />
-
-                  {editingId === 'new' && (
-                    <NewMissionForm
-                      days={data.days}
-                      kids={data.children}
-                      accent={ACCENT}
-                      emoji={draft.emoji}
-                      onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                      selectedDays={draft.days}
-                      onToggleDay={toggleDraftDay}
-                      assignedTo={draft.assignedTo}
-                      onToggleChild={toggleDraftChild}
-                      title={draft.title}
-                      onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                      points={draft.points}
-                      onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-                      onSave={saveMission}
-                      onCancel={cancelEdit}
-                    />
-                  )}
-
-                  {editingId !== 'new' && (
-                    <button
-                      onClick={openAdd}
-                      style={{ width: '100%', padding: 14, borderRadius: 16, border: '2px dashed #C4B896', background: 'transparent', color: '#6E6045', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}
-                    >
-                      ＋ Añadir misión
-                    </button>
-                  )}
                 </>
               )}
             </main>
