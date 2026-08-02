@@ -8,7 +8,6 @@ import { Header } from './components/Header'
 import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
-import { RedemptionHistory } from './components/RedemptionHistory'
 import { RedeemOptions } from './components/RedeemOptions'
 import { isMissionVisibleTo, pointsDeltaFor, redemptionsForChild, sortedMissions } from '../shared/logic'
 import type { Mission, MissionStatus, RewardConcept } from '../shared/types'
@@ -21,7 +20,7 @@ export default function App() {
   const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo')
   const [selected, setSelected] = useState(todayIndex())
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
-  const [screen, setScreen] = useState<'missions' | 'history' | 'redeem'>('missions')
+  const [screen, setScreen] = useState<'missions' | 'redeem'>('missions')
 
   const [pointsKey, setPointsKey] = useState(0)
   const [floatKey, setFloatKey] = useState(0)
@@ -147,16 +146,18 @@ export default function App() {
           childName={activeChild?.name}
           onSwitchChild={switchChild}
           onShowRedeem={hasChildren ? () => setScreen('redeem') : undefined}
-          onShowHistory={hasChildren ? () => setScreen('history') : undefined}
           onLogout={() => void logout()}
         />
 
-        {hasChildren && screen === 'history' && activeChild ? (
-          <RedemptionHistory redemptions={redemptionsForChild(data.redemptions, activeChild.id)} onBack={() => setScreen('missions')} />
-        ) : hasChildren && screen === 'redeem' && activeChild ? (
+        {hasChildren && screen === 'redeem' && activeChild ? (
           <RedeemOptions
             concepts={data.concepts}
             currentPoints={points}
+            // Se excluyen los canjes marcados como penalización: son registros antiguos de
+            // cuando las penalizaciones eran conceptos de canje (antes de MOO2-52), y este
+            // historial es solo "en qué me he gastado los puntos". Siguen contando en el saldo
+            // y aparecerán en "Mi historial de puntos" (MOO2-53), que sí lista todo.
+            redemptions={redemptionsForChild(data.redemptions, activeChild.id).filter((r) => !r.isPenalty)}
             onRedeem={handleRedeem}
             onBack={() => setScreen('missions')}
           />
