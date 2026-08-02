@@ -68,7 +68,6 @@ export default function App() {
   const [showConceptForm, setShowConceptForm] = useState(false)
   const [newConceptLabel, setNewConceptLabel] = useState('')
   const [newConceptEmoji, setNewConceptEmoji] = useState('🎯')
-  const [newConceptIsPenalty, setNewConceptIsPenalty] = useState(false)
   const [newConceptIsVariableCost, setNewConceptIsVariableCost] = useState(false)
   const [newConceptCost, setNewConceptCost] = useState('')
 
@@ -147,7 +146,6 @@ export default function App() {
     setShowConceptForm((v) => !v)
     setNewConceptLabel('')
     setNewConceptEmoji('🎯')
-    setNewConceptIsPenalty(false)
     setNewConceptIsVariableCost(false)
     setNewConceptCost('')
   }
@@ -157,7 +155,6 @@ export default function App() {
     const id = await addConcept({
       emoji: newConceptEmoji,
       label: newConceptLabel,
-      isPenalty: newConceptIsPenalty,
       isVariableCost: newConceptIsVariableCost,
       cost: Number.isFinite(cost) && cost > 0 ? cost : undefined,
     })
@@ -310,8 +307,6 @@ export default function App() {
                 onNewConceptLabelChange={setNewConceptLabel}
                 newConceptEmoji={newConceptEmoji}
                 onNewConceptEmojiChange={setNewConceptEmoji}
-                newConceptIsPenalty={newConceptIsPenalty}
-                onNewConceptIsPenaltyChange={setNewConceptIsPenalty}
                 newConceptIsVariableCost={newConceptIsVariableCost}
                 onNewConceptIsVariableCostChange={setNewConceptIsVariableCost}
                 newConceptCost={newConceptCost}
@@ -329,7 +324,7 @@ export default function App() {
                 onRename={(id, name) => void renameChild(id, name)}
                 onRemove={(id) => void removeChild(id)}
                 onEditPoints={(id, value) => void editChildPoints(id, value)}
-                onAward={(id, points, reason) => adjustChildPoints(id, points, reason)}
+                onAdjust={(id, points, reason) => adjustChildPoints(id, points, reason)}
                 onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
                 onDeleteRedemption={(id) => void deleteRedemption(id)}
                 onDeleteAdjustment={(id) => void deleteAdjustment(id)}

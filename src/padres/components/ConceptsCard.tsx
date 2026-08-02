@@ -14,8 +14,6 @@ interface Props {
   onNewConceptLabelChange: (v: string) => void
   newConceptEmoji: string
   onNewConceptEmojiChange: (v: string) => void
-  newConceptIsPenalty: boolean
-  onNewConceptIsPenaltyChange: (v: boolean) => void
   newConceptIsVariableCost: boolean
   onNewConceptIsVariableCostChange: (v: boolean) => void
   newConceptCost: string
@@ -34,8 +32,6 @@ export function ConceptsCard(props: Props) {
     onNewConceptLabelChange,
     newConceptEmoji,
     onNewConceptEmojiChange,
-    newConceptIsPenalty,
-    onNewConceptIsPenaltyChange,
     newConceptIsVariableCost,
     onNewConceptIsVariableCostChange,
     newConceptCost,
@@ -80,8 +76,8 @@ export function ConceptsCard(props: Props) {
               alignItems: 'center',
               padding: '8px 11px',
               borderRadius: 11,
-              border: c.isPenalty ? '1px solid #E3B8AA' : '1px solid #E4DBC8',
-              background: c.isPenalty ? '#F8ECE6' : '#FBF7EC',
+              border: '1px solid #E4DBC8',
+              background: '#FBF7EC',
               color: '#3A3228',
             }}
           >
@@ -160,10 +156,6 @@ export function ConceptsCard(props: Props) {
               style={{ marginTop: 9, width: '100%', padding: '9px 11px', borderRadius: 9, border: '1px solid #E0D6C2', fontSize: 14, fontWeight: 700, color: '#3A3228' }}
             />
           )}
-          <label style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 9, fontSize: 12.5, fontWeight: 700, color: '#6E6045', cursor: 'pointer' }}>
-            <input type="checkbox" checked={newConceptIsPenalty} onChange={(e) => onNewConceptIsPenaltyChange(e.target.checked)} />
-            Es una penalización
-          </label>
           <button onClick={onAddConcept} disabled={!canAddConcept} style={{ ...BTN_GO, marginTop: 9, width: '100%', opacity: canAddConcept ? 1 : 0.5 }}>
             Añadir concepto
           </button>

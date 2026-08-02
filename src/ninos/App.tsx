@@ -155,7 +155,7 @@ export default function App() {
           <RedemptionHistory redemptions={redemptionsForChild(data.redemptions, activeChild.id)} onBack={() => setScreen('missions')} />
         ) : hasChildren && screen === 'redeem' && activeChild ? (
           <RedeemOptions
-            concepts={data.concepts.filter((c) => !c.isPenalty)}
+            concepts={data.concepts}
             currentPoints={points}
             onRedeem={handleRedeem}
             onBack={() => setScreen('missions')}

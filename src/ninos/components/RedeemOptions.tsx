@@ -10,8 +10,9 @@ interface Props {
 }
 
 /** Canjear puntos desde la interfaz del niño (MOO-38). Reutiliza `redeemChildPoints` (ya usado
- *  por el panel de padres) — la única diferencia es que aquí solo se listan conceptos que no
- *  sean penalización, ya que no tiene sentido que un hijo se autoaplique una. */
+ *  por el panel de padres). Antes filtraba los conceptos marcados como penalización, para que
+ *  un hijo no pudiera autoaplicarse una; desde MOO2-52 ya no hace falta, porque las
+ *  penalizaciones dejaron de ser conceptos de canje y solo existen en la pantalla de padres. */
 export function RedeemOptions({ concepts, currentPoints, onRedeem, onBack }: Props) {
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [redeemVal, setRedeemVal] = useState('')

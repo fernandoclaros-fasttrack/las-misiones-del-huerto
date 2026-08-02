@@ -4,17 +4,27 @@ import type { BalanceEntry } from '../../shared/logic'
 import type { RewardConcept } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, PANEL_INPUT_STYLE, btn } from '../styles'
 
-type PanelName = null | 'edit' | 'award' | 'redeem' | 'history'
+type PanelName = null | 'edit' | 'award' | 'penalize' | 'redeem' | 'history'
 
 const BTN_LIGHT = btn('#F1ECDD', '#6E6045', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
 const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
+const BTN_LIGHT_RED = btn('#F3DCD3', '#A04A32', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
+
+/** Dar y quitar puntos son el mismo panel en las dos direcciones (MOO2-52): mismos campos,
+ *  misma validación y mismo registro, solo cambia el signo y los textos. Mantenerlos como un
+ *  único panel parametrizado es lo que hace que las dos acciones se sientan iguales, que es
+ *  justamente lo que pide el ticket. */
+const ADJUST_META = {
+  award: { sign: 1, verb: 'Dar', done: 'Dados', placeholder: 'Motivo (p. ej. ayudó a recoger la mesa)' },
+  penalize: { sign: -1, verb: 'Quitar', done: 'Quitados', placeholder: 'Motivo (p. ej. no recogió su cuarto)' },
+} as const
 
 interface Props {
   currentPoints: number
   concepts: RewardConcept[]
   entries: BalanceEntry[]
   onEditPoints: (value: number) => void
-  onAward: (points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
+  onAdjust: (points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
   onRedeem: (points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
   onDeleteRedemption: (redemptionId: string) => void
   onDeleteAdjustment: (adjustmentId: string) => void
@@ -25,35 +35,36 @@ export function ChildActionsPanel({
   concepts,
   entries,
   onEditPoints,
-  onAward,
+  onAdjust,
   onRedeem,
   onDeleteRedemption,
   onDeleteAdjustment,
 }: Props) {
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
-  const [awardVal, setAwardVal] = useState('')
-  const [awardReason, setAwardReason] = useState('')
+  const [adjustVal, setAdjustVal] = useState('')
+  const [adjustReason, setAdjustReason] = useState('')
   const [redeemVal, setRedeemVal] = useState('')
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
-  /** Evita que un doble click dé los puntos dos veces: la transacción de Firestore tarda un
-   *  momento y el panel no se cierra al confirmar (a propósito, para poder dar varios ajustes
+  /** Evita que un doble click aplique el ajuste dos veces: la transacción de Firestore tarda un
+   *  momento y el panel no se cierra al confirmar (a propósito, para poder hacer varios ajustes
    *  seguidos), así que sin esto el segundo click entra antes de que el primero termine.
    *  Tiene que ser un ref y no solo el estado: dos clicks en el mismo tick leen el mismo valor
-   *  de `awarding` (React no ha vuelto a renderizar todavía) y los dos pasarían el guard. El
+   *  de `adjusting` (React no ha vuelto a renderizar todavía) y los dos pasarían el guard. El
    *  estado se mantiene solo para poder deshabilitar el botón visualmente. */
-  const awardingRef = useRef(false)
-  const [awarding, setAwarding] = useState(false)
+  const adjustingRef = useRef(false)
+  const [adjusting, setAdjusting] = useState(false)
   const selectedConcept = concepts.find((c) => c.id === conceptId)
+  const adjustMeta = panel === 'award' || panel === 'penalize' ? ADJUST_META[panel] : null
 
   function open(name: Exclude<PanelName, null>) {
     setPanel((cur) => (cur === name ? null : name))
     setMsg(null)
     if (name === 'edit') setEditVal(String(currentPoints))
-    if (name === 'award') {
-      setAwardVal('')
-      setAwardReason('')
+    if (name === 'award' || name === 'penalize') {
+      setAdjustVal('')
+      setAdjustReason('')
     }
     if (name === 'redeem') setRedeemVal('')
   }
@@ -63,30 +74,29 @@ export function ChildActionsPanel({
     setPanel(null)
   }
 
-  async function confirmAward() {
-    if (awardingRef.current) return
-    const pts = parseInt(awardVal, 10) || 0
-    // `adjustChildPoints` acepta importes con signo (lo necesita MOO2-52 para las
-    // penalizaciones), pero este panel solo da puntos: un negativo aquí restaría en silencio
-    // detrás de un botón que dice "Dar" y un ➕.
-    if (pts < 0) {
+  async function confirmAdjust() {
+    if (adjustingRef.current || !adjustMeta) return
+    const magnitude = parseInt(adjustVal, 10) || 0
+    // La dirección la decide el panel, no el signo que escriba el padre/madre: un negativo en
+    // "Quitar" significaría sumar, que es lo contrario de lo que dice el botón.
+    if (magnitude < 0) {
       setMsg({ text: 'Introduce un número positivo.', err: true })
       return
     }
-    awardingRef.current = true
-    setAwarding(true)
+    adjustingRef.current = true
+    setAdjusting(true)
     try {
-      const result = await onAward(pts, awardReason)
+      const result = await onAdjust(magnitude * adjustMeta.sign, adjustReason)
       if (!result.ok) {
         setMsg({ text: result.error!, err: true })
         return
       }
-      setAwardVal('')
-      setAwardReason('')
-      setMsg({ text: `Dados ${pts} pts.`, err: false })
+      setAdjustVal('')
+      setAdjustReason('')
+      setMsg({ text: `${adjustMeta.done} ${magnitude} pts.`, err: false })
     } finally {
-      awardingRef.current = false
-      setAwarding(false)
+      adjustingRef.current = false
+      setAdjusting(false)
     }
   }
 
@@ -117,6 +127,9 @@ export function ChildActionsPanel({
         <button onClick={() => open('award')} style={BTN_LIGHT_GREEN}>
           ➕ Dar
         </button>
+        <button onClick={() => open('penalize')} style={BTN_LIGHT_RED}>
+          ➖ Quitar
+        </button>
         <button onClick={() => open('redeem')} style={BTN_LIGHT_GREEN}>
           🎁 Canjear
         </button>
@@ -139,27 +152,27 @@ export function ChildActionsPanel({
         </div>
       )}
 
-      {panel === 'award' && (
+      {adjustMeta && (
         <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10 }}>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
             <input
               type="number"
-              value={awardVal}
-              onChange={(e) => setAwardVal(e.target.value)}
+              value={adjustVal}
+              onChange={(e) => setAdjustVal(e.target.value)}
               placeholder="puntos"
               style={PANEL_INPUT_STYLE}
             />
-            <button onClick={confirmAward} disabled={awarding} style={{ ...BTN_SAVE, opacity: awarding ? 0.6 : 1 }}>
-              Dar
+            <button onClick={confirmAdjust} disabled={adjusting} style={{ ...BTN_SAVE, opacity: adjusting ? 0.6 : 1 }}>
+              {adjustMeta.verb}
             </button>
             <button onClick={() => setPanel(null)} style={BTN_CANCEL}>
               Cancelar
             </button>
           </div>
           <input
-            value={awardReason}
-            onChange={(e) => setAwardReason(e.target.value)}
-            placeholder="Motivo (p. ej. ayudó a recoger la mesa)"
+            value={adjustReason}
+            onChange={(e) => setAdjustReason(e.target.value)}
+            placeholder={adjustMeta.placeholder}
             // `PANEL_INPUT_STYLE` trae `flex: 1` porque el resto de campos van en una fila
             // flex; este va suelto en el panel, así que necesita ancho propio.
             style={{ ...PANEL_INPUT_STYLE, flex: undefined, width: '100%', boxSizing: 'border-box' }}
@@ -173,7 +186,6 @@ export function ChildActionsPanel({
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
             {concepts.map((c) => {
               const active = c.id === conceptId
-              const activeColor = c.isPenalty ? '#A04A32' : '#5B8C3E'
               return (
                 <button
                   key={c.id}
@@ -181,8 +193,8 @@ export function ChildActionsPanel({
                   style={{
                     padding: '6px 10px',
                     borderRadius: 10,
-                    border: active ? `2px solid ${activeColor}` : c.isPenalty ? '1px solid #E3B8AA' : '1px solid #E4DBC8',
-                    background: active ? (c.isPenalty ? '#F3DCD3' : '#DDEBC9') : '#FFFDF6',
+                    border: active ? '2px solid #5B8C3E' : '1px solid #E4DBC8',
+                    background: active ? '#DDEBC9' : '#FFFDF6',
                     color: '#3A3228',
                     fontWeight: 700,
                     fontSize: 12.5,
