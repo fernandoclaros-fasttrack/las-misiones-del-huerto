@@ -68,6 +68,22 @@ export interface Redemption {
   timestamp: number
 }
 
+/** Ajuste manual de los puntos de un hijo/a con un motivo escrito (MOO2-51). A diferencia de
+ *  `Redemption` (que siempre resta y va ligada a un concepto de canje configurado) esto es un
+ *  movimiento suelto: el padre/madre escribe cuántos puntos y por qué. `points` va **con signo**
+ *  — positivo al dar puntos (MOO2-51); el caso negativo (penalizaciones, MOO2-52) reutilizará
+ *  esta misma estructura. Se muestran mezclados con los canjes en el historial del hijo/a. */
+export interface PointAdjustment {
+  id: string
+  childId: string
+  /** Con signo: positivo suma puntos al hijo/a, negativo los resta. Nunca 0. */
+  points: number
+  /** Motivo escrito por el padre/madre. Obligatorio: no se puede guardar vacío. */
+  reason: string
+  /** epoch ms */
+  timestamp: number
+}
+
 /** Quién realizó una acción registrada en `FamilyData.changeLog` (MOO-39): la pantalla de
  *  hijos solo puede completar/descompletar misiones, todo lo demás sale de la de padres — no
  *  hay una identidad por persona (login es una única contraseña compartida, ver MOO-24). */
@@ -94,6 +110,10 @@ export interface FamilyData {
   /** Histórico de canjes por hijo (MOO-22). Solo se generan al canjear puntos de un hijo
    *  concreto (MOO-21); el canje del contador compartido (MOO-11) no genera entradas aquí. */
   redemptions: Redemption[]
+  /** Ajustes manuales de puntos con motivo (MOO2-51). Complementan a `redemptions` en el
+   *  historial por hijo/a: ambos son movimientos del saldo, pero un canje gasta puntos en un
+   *  concepto configurado y un ajuste es puntual y lleva texto libre. */
+  adjustments: PointAdjustment[]
   /** Orden manual de la vista global "Todo" (MOO-30), por `seriesId` (no por `id` de misión,
    *  que es distinto por copia/día). Vacío = orden alfabético por título, igual criterio que
    *  `Day.missionOrder` — ver `sortedMissionSeries()` en logic.ts. */

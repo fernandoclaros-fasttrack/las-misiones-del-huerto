@@ -50,8 +50,10 @@ export default function App() {
     renameChild,
     removeChild,
     editChildPoints,
+    adjustChildPoints,
     redeemChildPoints,
     deleteRedemption,
+    deleteAdjustment,
   } = useFamilyData('padre')
 
   const [selected, setSelected] = useState(todayIndex())
@@ -322,12 +324,15 @@ export default function App() {
                 kids={data.children}
                 concepts={data.concepts}
                 redemptions={data.redemptions}
+                adjustments={data.adjustments}
                 onAdd={(name) => void addChild(name)}
                 onRename={(id, name) => void renameChild(id, name)}
                 onRemove={(id) => void removeChild(id)}
                 onEditPoints={(id, value) => void editChildPoints(id, value)}
+                onAward={(id, points, reason) => adjustChildPoints(id, points, reason)}
                 onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
                 onDeleteRedemption={(id) => void deleteRedemption(id)}
+                onDeleteAdjustment={(id) => void deleteAdjustment(id)}
               />
             </div>
 

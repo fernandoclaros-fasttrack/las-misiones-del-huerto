@@ -30,7 +30,8 @@ function nextId(): number {
  *  reproducir exactamente el "visible para todos" de antes de MOO-27, incluyendo hijos
  *  añadidos después de que se guardara la misión por última vez. `missionOrder`/
  *  `globalMissionOrder` que faltan se rellenan con `[]` (orden alfabético por defecto), igual
- *  que el comportamiento previo a MOO-29/MOO-30. Conceptos/canjes guardados antes de MOO-41 no
+ *  que el comportamiento previo a MOO-29/MOO-30, y lo mismo con `adjustments` para documentos
+ *  anteriores a MOO2-51. Conceptos/canjes guardados antes de MOO-41 no
  *  tienen `isPenalty` — se infiere de la etiqueta (contiene "penaliz") en vez de asumir `false`,
  *  para que un concepto de penalización creado a mano antes de esta funcionalidad (y sus canjes
  *  ya registrados) se sigan mostrando en rojo sin que el padre/madre tenga que recrearlo. */
@@ -50,7 +51,16 @@ function normalize(raw: FamilyData): FamilyData {
   const looksLikePenalty = (label: string) => /penaliz/i.test(label)
   const concepts = (raw.concepts ?? []).map((c) => ({ ...c, isPenalty: c.isPenalty ?? looksLikePenalty(c.label) }))
   const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
-  return { ...raw, days, children, concepts, redemptions, globalMissionOrder: raw.globalMissionOrder ?? [], changeLog: raw.changeLog ?? [] }
+  return {
+    ...raw,
+    days,
+    children,
+    concepts,
+    redemptions,
+    adjustments: raw.adjustments ?? [],
+    globalMissionOrder: raw.globalMissionOrder ?? [],
+    changeLog: raw.changeLog ?? [],
+  }
 }
 
 /** Puntos totales en juego (contador compartido + puntos por hijo). Comparar este valor
@@ -262,6 +272,38 @@ export function useFamilyData(actor: ChangeActor) {
               if (!child) return null
               const verb = concept.isPenalty ? 'Aplicó una penalización a' : 'Canjeó puntos de'
               return `${verb} ${child.name}: ${concept.emoji} ${concept.label} (${Math.round(points) || 0} pts)`
+            },
+          ),
+        ),
+
+      adjustChildPoints: (childId: string, points: number, reason: string) =>
+        run(
+          withHistory(
+            actor,
+            (d) => {
+              const r = logic.adjustChildPoints(d, childId, points, reason, nextId())
+              return { patch: r.ok ? { children: r.children, adjustments: r.adjustments } : null, result: r }
+            },
+            (d) => {
+              const child = d.children.find((c) => c.id === childId)
+              if (!child) return null
+              const pts = Math.round(points) || 0
+              const verb = pts >= 0 ? 'Dio' : 'Quitó'
+              return `${verb} ${Math.abs(pts)} pts a ${child.name}: ${reason.trim()}`
+            },
+          ),
+        ),
+
+      deleteAdjustment: (adjustmentId: string) =>
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.deleteAdjustment(d, adjustmentId), result: undefined }),
+            (d) => {
+              const adjustment = d.adjustments.find((a) => a.id === adjustmentId)
+              if (!adjustment) return null
+              const child = d.children.find((c) => c.id === adjustment.childId)
+              return `Eliminó un ajuste de puntos${child ? ` de ${child.name}` : ''}: ${adjustment.reason}`
             },
           ),
         ),
