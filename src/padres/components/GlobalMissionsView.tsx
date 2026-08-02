@@ -1,7 +1,8 @@
 import { MissionCard } from './MissionCard'
 import { MissionsList } from './MissionsList'
 import { NewMissionForm } from './NewMissionForm'
-import type { Child, Day, Mission } from '../../shared/types'
+import { MissionTemplatesQuickPick } from './MissionTemplatesQuickPick'
+import type { Child, Day, Mission, MissionTemplate } from '../../shared/types'
 
 interface Props {
   missions: Mission[]
@@ -16,6 +17,10 @@ interface Props {
   draftTitle: string
   draftPoints: number | string
   draftDays: number[]
+  draftIsOneOff: boolean
+  onToggleDraftOneOff: () => void
+  draftOneOffDate: string
+  onDraftOneOffDateChange: (date: string) => void
   draftAssignedTo: string[]
   onDraftEmojiChange: (emoji: string) => void
   onDraftTitleChange: (title: string) => void
@@ -31,6 +36,13 @@ interface Props {
    *  logic.ts. A diferencia de la vista por día, aquí no hay un día de referencia para "borrar
    *  solo esta copia". */
   onDelete: (mission: Mission) => void
+  /** Lista rápida de misiones ya creadas (MOO2-57/58), mostrada junto al formulario de alta. */
+  templates: MissionTemplate[]
+  selectedTemplateIds: string[]
+  onToggleTemplateSelect: (id: string) => void
+  onCreateFromTemplates: () => void
+  onEditTemplate: (id: string, changes: { title: string; points: number }) => void
+  onDeleteTemplate: (id: string) => void
 }
 
 /** Vista global de todas las misiones configuradas (MOO-30): una fila por serie de misión
@@ -53,6 +65,10 @@ export function GlobalMissionsView({
   draftTitle,
   draftPoints,
   draftDays,
+  draftIsOneOff,
+  onToggleDraftOneOff,
+  draftOneOffDate,
+  onDraftOneOffDateChange,
   draftAssignedTo,
   onDraftEmojiChange,
   onDraftTitleChange,
@@ -65,6 +81,12 @@ export function GlobalMissionsView({
   onAdd,
   onDuplicate,
   onDelete,
+  templates,
+  selectedTemplateIds,
+  onToggleTemplateSelect,
+  onCreateFromTemplates,
+  onEditTemplate,
+  onDeleteTemplate,
 }: Props) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
@@ -74,23 +96,37 @@ export function GlobalMissionsView({
       </div>
 
       {editingId === 'new' ? (
-        <NewMissionForm
-          days={days}
-          kids={kids}
-          accent={accent}
-          emoji={draftEmoji}
-          onEmojiChange={onDraftEmojiChange}
-          selectedDays={draftDays}
-          onToggleDay={onToggleDraftDay}
-          assignedTo={draftAssignedTo}
-          onToggleChild={onToggleDraftChild}
-          title={draftTitle}
-          onTitleChange={onDraftTitleChange}
-          points={draftPoints}
-          onPointsChange={onDraftPointsChange}
-          onSave={onSave}
-          onCancel={onCancel}
-        />
+        <>
+          <MissionTemplatesQuickPick
+            templates={templates}
+            selectedIds={selectedTemplateIds}
+            onToggleSelect={onToggleTemplateSelect}
+            onCreateSelected={onCreateFromTemplates}
+            onEditTemplate={onEditTemplate}
+            onDeleteTemplate={onDeleteTemplate}
+          />
+          <NewMissionForm
+            days={days}
+            kids={kids}
+            accent={accent}
+            emoji={draftEmoji}
+            onEmojiChange={onDraftEmojiChange}
+            selectedDays={draftDays}
+            onToggleDay={onToggleDraftDay}
+            isOneOff={draftIsOneOff}
+            onToggleOneOff={onToggleDraftOneOff}
+            oneOffDate={draftOneOffDate}
+            onOneOffDateChange={onDraftOneOffDateChange}
+            assignedTo={draftAssignedTo}
+            onToggleChild={onToggleDraftChild}
+            title={draftTitle}
+            onTitleChange={onDraftTitleChange}
+            points={draftPoints}
+            onPointsChange={onDraftPointsChange}
+            onSave={onSave}
+            onCancel={onCancel}
+          />
+        </>
       ) : (
         <button
           onClick={onAdd}
@@ -130,6 +166,10 @@ export function GlobalMissionsView({
               draftTitle={draftTitle}
               draftPoints={draftPoints}
               draftDays={draftDays}
+              draftIsOneOff={draftIsOneOff}
+              onToggleDraftOneOff={onToggleDraftOneOff}
+              draftOneOffDate={draftOneOffDate}
+              onDraftOneOffDateChange={onDraftOneOffDateChange}
               draftAssignedTo={draftAssignedTo}
               onDraftEmojiChange={onDraftEmojiChange}
               onDraftTitleChange={onDraftTitleChange}

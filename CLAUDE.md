@@ -140,6 +140,30 @@ without a matching risk reduction.
   argument from a mission with no explicit day context, done via `Math.min(...mission.activeDays)`,
   which is guaranteed to be the day the representative copy's `id` actually lives on (see
   `uniqueMissionSeries()` in `src/shared/logic.ts`).
+- **One-off missions** (`Mission.oneOffDate`, MOO2-56/61) bolt a real calendar date onto a data
+  model that otherwise only knows "day of the week, repeating forever" (`Day` is one of 7 fixed
+  weekday slots, not a specific week). A one-off mission still lives in the `Day` bucket matching
+  its date's weekday (reuses `activeDays`/`editMission`'s existing per-day-copy machinery
+  unchanged — it's just always a single-element array for a one-off), but `isMissionActiveToday()`
+  in `logic.ts` is what actually hides it from the kids screen except on the exact date, so it
+  doesn't come back every time that weekday recurs. Parents always see it regardless of date (no
+  visibility gate there, same as always), badged with its date instead of the weekday dots.
+  Switching a mission between one-off and recurring (MOO2-61) is *not* special-cased in
+  `editMission` — it's just an edit to `activeDays` down to one day, same as any other day-selection
+  change; only the `oneOffDate` field itself needs explicit handling. Firestore rejects `undefined`
+  field values even nested inside an array, so clearing `oneOffDate` back to recurring has to drop
+  the key via destructuring, not set it to `undefined`.
+- **Mission templates** (`FamilyData.missionTemplates`, MOO2-57/58/59/60): the "quick pick" list
+  under "Añadir misión" is a completely separate record from any scheduled `Mission` — matched by
+  title (case/whitespace-insensitive) so re-saving the same mission refreshes its template instead
+  of duplicating it. It's only written to from `addMission` when the mission is typed by hand
+  (`useFamilyData.ts`'s `fromTemplate` opt skips it when creating from the quick-pick list itself,
+  so picking a template doesn't re-add itself). `editMission` never touches it: editing a scheduled
+  mission's points doesn't change what the quick-pick entry offers next time, and editing/deleting
+  a template (MOO2-59/60) never touches any already-scheduled mission — they're independent from
+  the moment a mission is first created. `createMissionsFromTemplates` always creates *recurring*
+  missions on the day currently being viewed (same default as a normal "Añadir misión"); one-off
+  creation from the quick-pick list was out of scope.
 
 ## Verifying changes
 

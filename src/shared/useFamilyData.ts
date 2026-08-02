@@ -61,6 +61,8 @@ function normalize(raw: FamilyData): FamilyData {
     // Las entradas anteriores a MOO2-53 no tienen desglose por hijo/a y no se puede
     // reconstruir: quedan visibles en el historial de padres pero fuera del de los niños.
     changeLog: (raw.changeLog ?? []).map((e) => ({ ...e, deltas: e.deltas ?? [] })),
+    // Documentos anteriores a MOO2-57 no tienen lista rápida todavía.
+    missionTemplates: raw.missionTemplates ?? [],
   }
 }
 
@@ -191,8 +193,42 @@ export function useFamilyData(actor: ChangeActor) {
           ),
         ),
 
-      addMission: (input: logic.NewMissionInput) =>
-        run((d) => ({ patch: logic.addMission(d, input, nextId()), result: undefined })),
+      // `fromTemplate` evita duplicar la entrada en la lista rápida (MOO2-57) cuando la misión
+      // se crea eligiéndola de esa misma lista en vez de escribirla a mano.
+      addMission: (input: logic.NewMissionInput, opts?: { fromTemplate?: boolean }) =>
+        run((d) => {
+          const { days } = logic.addMission(d, input, nextId())
+          const missionTemplates = opts?.fromTemplate
+            ? d.missionTemplates
+            : logic.upsertMissionTemplate(d.missionTemplates, { emoji: input.emoji, title: input.title, points: input.points }, nextId())
+          return { patch: { days, missionTemplates }, result: undefined }
+        }),
+
+      // Crea una misión por cada plantilla seleccionada (MOO2-58), todas con los mismos días y
+      // asignación (el contexto de "Añadir misión" desde el que se abrió la lista rápida). Se
+      // encadenan sobre `days` en vez de partir de `d.days` en cada vuelta para que ninguna
+      // creación pise a la anterior.
+      createMissionsFromTemplates: (templateIds: string[], dayIndices: number[], assignedTo: string[]) =>
+        run((d) => {
+          let days = d.days
+          for (const templateId of templateIds) {
+            const template = d.missionTemplates.find((t) => t.id === templateId)
+            if (!template) continue
+            const result = logic.addMission(
+              { ...d, days },
+              { emoji: template.emoji, title: template.title, points: template.points, dayIndices, assignedTo },
+              nextId(),
+            )
+            days = result.days
+          }
+          return { patch: { days }, result: undefined }
+        }),
+
+      editMissionTemplate: (templateId: string, changes: { title: string; points: number }) =>
+        run((d) => ({ patch: { missionTemplates: logic.editMissionTemplate(d.missionTemplates, templateId, changes) }, result: undefined })),
+
+      deleteMissionTemplate: (templateId: string) =>
+        run((d) => ({ patch: { missionTemplates: logic.deleteMissionTemplate(d.missionTemplates, templateId) }, result: undefined })),
 
       editMission: (missionId: string, input: logic.EditMissionInput) =>
         run(
