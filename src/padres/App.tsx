@@ -213,6 +213,10 @@ export default function App() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
     if (draft.isOneOff) {
+      // El input de fecha nativo se puede dejar vacío (borrando todos los dígitos); sin esta
+      // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
+      // editar, eso borraría la única copia existente sin crear una de repuesto.
+      if (!draft.oneOffDate) return
       const dayIdx = weekdayOfISODate(draft.oneOffDate)
       if (editingId === 'new') {
         await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
