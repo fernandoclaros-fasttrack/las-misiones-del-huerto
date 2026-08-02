@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import type { Child, Redemption, RewardConcept } from '../../shared/types'
-import { redemptionsForChild } from '../../shared/logic'
+import type { Child, PointAdjustment, Redemption, RewardConcept } from '../../shared/types'
+import { balanceEntriesForChild } from '../../shared/logic'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE } from '../styles'
 import { ChildActionsPanel } from './ChildActionsPanel'
 
@@ -8,15 +8,31 @@ interface Props {
   kids: Child[]
   concepts: RewardConcept[]
   redemptions: Redemption[]
+  adjustments: PointAdjustment[]
   onAdd: (name: string) => void
   onRename: (childId: string, name: string) => void
   onRemove: (childId: string) => void
   onEditPoints: (childId: string, value: number) => void
+  onAward: (childId: string, points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
   onRedeem: (childId: string, points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
   onDeleteRedemption: (redemptionId: string) => void
+  onDeleteAdjustment: (adjustmentId: string) => void
 }
 
-export function ChildrenCard({ kids, concepts, redemptions, onAdd, onRename, onRemove, onEditPoints, onRedeem, onDeleteRedemption }: Props) {
+export function ChildrenCard({
+  kids,
+  concepts,
+  redemptions,
+  adjustments,
+  onAdd,
+  onRename,
+  onRemove,
+  onEditPoints,
+  onAward,
+  onRedeem,
+  onDeleteRedemption,
+  onDeleteAdjustment,
+}: Props) {
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
   const [draftName, setDraftName] = useState('')
 
@@ -81,10 +97,12 @@ export function ChildrenCard({ kids, concepts, redemptions, onAdd, onRename, onR
               <ChildActionsPanel
                 currentPoints={child.points}
                 concepts={concepts}
-                redemptions={redemptionsForChild(redemptions, child.id)}
+                entries={balanceEntriesForChild(redemptions, adjustments, child.id)}
                 onEditPoints={(value) => onEditPoints(child.id, value)}
+                onAward={(points, reason) => onAward(child.id, points, reason)}
                 onRedeem={(points, concept) => onRedeem(child.id, points, concept)}
                 onDeleteRedemption={onDeleteRedemption}
+                onDeleteAdjustment={onDeleteAdjustment}
               />
             </div>
           ),

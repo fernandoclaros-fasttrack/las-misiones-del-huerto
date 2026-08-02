@@ -1,4 +1,4 @@
-import type { Child, Day, FamilyData, Mission, MissionStatus, Redemption, RewardConcept } from './types'
+import type { Child, Day, FamilyData, Mission, MissionStatus, PointAdjustment, Redemption, RewardConcept } from './types'
 
 /**
  * Reglas de negocio puras (ver README del handoff de diseño, sección "Reglas de negocio").
@@ -502,6 +502,67 @@ export function redeemChildPoints(
 
 export function redemptionsForChild(redemptions: Redemption[], childId: string): Redemption[] {
   return redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
+}
+
+export interface ChildAdjustResult {
+  ok: boolean
+  error?: string
+  children?: Child[]
+  adjustments?: PointAdjustment[]
+}
+
+/** Da puntos a un hijo/a con un motivo obligatorio (MOO2-51). `points` llega con signo, así que
+ *  esta misma función sirve para el caso negativo (penalizaciones) sin duplicar validación; lo
+ *  único que no se acepta es 0, que no movería el saldo pero sí dejaría una entrada en el
+ *  historial. No se comprueba que haya saldo suficiente a propósito: a diferencia de un canje,
+ *  el saldo puede quedar negativo (decisión de producto, MOO2-52). */
+export function adjustChildPoints(
+  data: FamilyData,
+  childId: string,
+  points: number,
+  reason: string,
+  idSeed: number,
+): ChildAdjustResult {
+  const pts = Math.round(points) || 0
+  const trimmed = reason.trim()
+  const child = data.children.find((c) => c.id === childId)
+  if (!child) return { ok: false, error: 'No se encuentra a ese hijo/a.' }
+  if (pts === 0) return { ok: false, error: 'Introduce cuántos puntos dar.' }
+  if (!trimmed) return { ok: false, error: 'Escribe el motivo.' }
+  const children = data.children.map((c) => (c.id === childId ? { ...c, points: c.points + pts } : c))
+  const adjustment: PointAdjustment = { id: `adj${idSeed}`, childId, points: pts, reason: trimmed, timestamp: idSeed }
+  return { ok: true, children, adjustments: [...data.adjustments, adjustment] }
+}
+
+/** Deshace un ajuste manual devolviendo (o retirando) sus puntos, igual que `deleteRedemption`
+ *  hace con un canje — el historial del hijo/a mezcla ambos, así que las dos clases de entrada
+ *  tienen que poder corregirse de la misma forma. */
+export function deleteAdjustment(data: FamilyData, adjustmentId: string): Pick<FamilyData, 'children' | 'adjustments'> {
+  const adjustment = data.adjustments.find((a) => a.id === adjustmentId)
+  if (!adjustment) return { children: data.children, adjustments: data.adjustments }
+  const children = data.children.map((c) => (c.id === adjustment.childId ? { ...c, points: c.points - adjustment.points } : c))
+  return { children, adjustments: data.adjustments.filter((a) => a.id !== adjustmentId) }
+}
+
+/** Una fila del historial de saldo de un hijo/a: un canje (siempre resta, ligado a un concepto)
+ *  o un ajuste manual con motivo (MOO2-51). Se unifican aquí para que el historial pueda
+ *  ordenarlos entre sí por fecha en vez de mostrar dos listas separadas. */
+export type BalanceEntry =
+  | { kind: 'redemption'; redemption: Redemption; timestamp: number }
+  | { kind: 'adjustment'; adjustment: PointAdjustment; timestamp: number }
+
+/** Historial de saldo de un hijo/a: canjes y ajustes manuales mezclados, del más reciente al
+ *  más antiguo (mismo criterio que ya usaba `redemptionsForChild`). */
+export function balanceEntriesForChild(
+  redemptions: Redemption[],
+  adjustments: PointAdjustment[],
+  childId: string,
+): BalanceEntry[] {
+  const entries: BalanceEntry[] = [
+    ...redemptions.filter((r) => r.childId === childId).map((r): BalanceEntry => ({ kind: 'redemption', redemption: r, timestamp: r.timestamp })),
+    ...adjustments.filter((a) => a.childId === childId).map((a): BalanceEntry => ({ kind: 'adjustment', adjustment: a, timestamp: a.timestamp })),
+  ]
+  return entries.sort((a, b) => b.timestamp - a.timestamp)
 }
 
 /** Borra una entrada del historial de canjes (MOO-44) y devuelve sus puntos al hijo, para

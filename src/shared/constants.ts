@@ -123,6 +123,7 @@ export function seedFamilyData(): FamilyData {
     days,
     children: [],
     redemptions: [],
+    adjustments: [],
     globalMissionOrder: [],
     changeLog: [],
   }

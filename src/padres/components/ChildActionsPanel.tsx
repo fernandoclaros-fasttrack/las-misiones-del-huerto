@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { isConceptVariableCost } from '../../shared/logic'
-import type { Redemption, RewardConcept } from '../../shared/types'
+import type { BalanceEntry } from '../../shared/logic'
+import type { RewardConcept } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, PANEL_INPUT_STYLE, btn } from '../styles'
 
-type PanelName = null | 'edit' | 'redeem' | 'history'
+type PanelName = null | 'edit' | 'award' | 'redeem' | 'history'
 
 const BTN_LIGHT = btn('#F1ECDD', '#6E6045', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
 const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px', fontSize: 12.5 })
@@ -11,24 +12,49 @@ const BTN_LIGHT_GREEN = btn('#DDEBC9', '#3F6B26', { flex: 1, padding: '8px 6px',
 interface Props {
   currentPoints: number
   concepts: RewardConcept[]
-  redemptions: Redemption[]
+  entries: BalanceEntry[]
   onEditPoints: (value: number) => void
+  onAward: (points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
   onRedeem: (points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
   onDeleteRedemption: (redemptionId: string) => void
+  onDeleteAdjustment: (adjustmentId: string) => void
 }
 
-export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEditPoints, onRedeem, onDeleteRedemption }: Props) {
+export function ChildActionsPanel({
+  currentPoints,
+  concepts,
+  entries,
+  onEditPoints,
+  onAward,
+  onRedeem,
+  onDeleteRedemption,
+  onDeleteAdjustment,
+}: Props) {
   const [panel, setPanel] = useState<PanelName>(null)
   const [editVal, setEditVal] = useState('')
+  const [awardVal, setAwardVal] = useState('')
+  const [awardReason, setAwardReason] = useState('')
   const [redeemVal, setRedeemVal] = useState('')
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
+  /** Evita que un doble click dé los puntos dos veces: la transacción de Firestore tarda un
+   *  momento y el panel no se cierra al confirmar (a propósito, para poder dar varios ajustes
+   *  seguidos), así que sin esto el segundo click entra antes de que el primero termine.
+   *  Tiene que ser un ref y no solo el estado: dos clicks en el mismo tick leen el mismo valor
+   *  de `awarding` (React no ha vuelto a renderizar todavía) y los dos pasarían el guard. El
+   *  estado se mantiene solo para poder deshabilitar el botón visualmente. */
+  const awardingRef = useRef(false)
+  const [awarding, setAwarding] = useState(false)
   const selectedConcept = concepts.find((c) => c.id === conceptId)
 
   function open(name: Exclude<PanelName, null>) {
     setPanel((cur) => (cur === name ? null : name))
     setMsg(null)
     if (name === 'edit') setEditVal(String(currentPoints))
+    if (name === 'award') {
+      setAwardVal('')
+      setAwardReason('')
+    }
     if (name === 'redeem') setRedeemVal('')
   }
 
@@ -36,6 +62,34 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
     onEditPoints(parseInt(editVal, 10) || 0)
     setPanel(null)
   }
+
+  async function confirmAward() {
+    if (awardingRef.current) return
+    const pts = parseInt(awardVal, 10) || 0
+    // `adjustChildPoints` acepta importes con signo (lo necesita MOO2-52 para las
+    // penalizaciones), pero este panel solo da puntos: un negativo aquí restaría en silencio
+    // detrás de un botón que dice "Dar" y un ➕.
+    if (pts < 0) {
+      setMsg({ text: 'Introduce un número positivo.', err: true })
+      return
+    }
+    awardingRef.current = true
+    setAwarding(true)
+    try {
+      const result = await onAward(pts, awardReason)
+      if (!result.ok) {
+        setMsg({ text: result.error!, err: true })
+        return
+      }
+      setAwardVal('')
+      setAwardReason('')
+      setMsg({ text: `Dados ${pts} pts.`, err: false })
+    } finally {
+      awardingRef.current = false
+      setAwarding(false)
+    }
+  }
+
   async function confirmRedeem() {
     const concept = selectedConcept
     if (!concept) {
@@ -56,9 +110,12 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         <button onClick={() => open('edit')} style={BTN_LIGHT}>
           ✏️ Editar
+        </button>
+        <button onClick={() => open('award')} style={BTN_LIGHT_GREEN}>
+          ➕ Dar
         </button>
         <button onClick={() => open('redeem')} style={BTN_LIGHT_GREEN}>
           🎁 Canjear
@@ -79,6 +136,35 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
               Cancelar
             </button>
           </div>
+        </div>
+      )}
+
+      {panel === 'award' && (
+        <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            <input
+              type="number"
+              value={awardVal}
+              onChange={(e) => setAwardVal(e.target.value)}
+              placeholder="puntos"
+              style={PANEL_INPUT_STYLE}
+            />
+            <button onClick={confirmAward} disabled={awarding} style={{ ...BTN_SAVE, opacity: awarding ? 0.6 : 1 }}>
+              Dar
+            </button>
+            <button onClick={() => setPanel(null)} style={BTN_CANCEL}>
+              Cancelar
+            </button>
+          </div>
+          <input
+            value={awardReason}
+            onChange={(e) => setAwardReason(e.target.value)}
+            placeholder="Motivo (p. ej. ayudó a recoger la mesa)"
+            // `PANEL_INPUT_STYLE` trae `flex: 1` porque el resto de campos van en una fila
+            // flex; este va suelto en el panel, así que necesita ancho propio.
+            style={{ ...PANEL_INPUT_STYLE, flex: undefined, width: '100%', boxSizing: 'border-box' }}
+          />
+          {msg && <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: msg.err ? '#A04A32' : '#3F6B26' }}>{msg.text}</div>}
         </div>
       )}
 
@@ -131,34 +217,61 @@ export function ChildActionsPanel({ currentPoints, concepts, redemptions, onEdit
 
       {panel === 'history' && (
         <div style={{ marginTop: 8, background: '#FBF7EC', borderRadius: 11, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {redemptions.length === 0 ? (
-            <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 600, textAlign: 'center', padding: '4px 0' }}>Sin canjes todavía.</div>
+          {entries.length === 0 ? (
+            <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 600, textAlign: 'center', padding: '4px 0' }}>Sin movimientos todavía.</div>
           ) : (
-            redemptions.map((r) => (
-              <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 17 }}>{r.conceptEmoji}</span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13 }}>{r.conceptLabel}</div>
-                  <div style={{ fontSize: 11.5, color: '#8A7E6B', fontWeight: 600 }}>{new Date(r.timestamp).toLocaleDateString('es-ES')}</div>
+            entries.map((entry) => {
+              // Un canje siempre resta puntos y se identifica por su concepto; un ajuste manual
+              // (MOO2-51) lleva signo propio y un motivo escrito a mano. Se pintan con la misma
+              // fila para que el historial se lea como una sola lista ordenada por fecha.
+              const isRedemption = entry.kind === 'redemption'
+              const { id, emoji, text, delta, timestamp } = isRedemption
+                ? {
+                    id: entry.redemption.id,
+                    emoji: entry.redemption.conceptEmoji,
+                    text: entry.redemption.conceptLabel,
+                    delta: -entry.redemption.points,
+                    timestamp: entry.redemption.timestamp,
+                  }
+                : {
+                    id: entry.adjustment.id,
+                    emoji: entry.adjustment.points >= 0 ? '➕' : '➖',
+                    text: entry.adjustment.reason,
+                    delta: entry.adjustment.points,
+                    timestamp: entry.adjustment.timestamp,
+                  }
+              const negative = delta < 0
+              return (
+                <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 17 }}>{emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13 }}>{text}</div>
+                    <div style={{ fontSize: 11.5, color: '#8A7E6B', fontWeight: 600 }}>{new Date(timestamp).toLocaleDateString('es-ES')}</div>
+                  </div>
+                  <span
+                    style={{
+                      background: negative ? '#F6DCD3' : '#E5EFD6',
+                      color: negative ? '#A0402A' : '#40682A',
+                      fontWeight: 800,
+                      fontSize: 12,
+                      padding: '4px 8px',
+                      borderRadius: 999,
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {negative ? '−' : '+'}
+                    {Math.abs(delta)} pts
+                  </span>
+                  <button
+                    onClick={() => (isRedemption ? onDeleteRedemption(id) : onDeleteAdjustment(id))}
+                    title={isRedemption ? 'Eliminar canje' : 'Eliminar ajuste'}
+                    style={{ ...BTN_LIGHT, flex: '0 0 auto', padding: '6px 8px' }}
+                  >
+                    🗑️
+                  </button>
                 </div>
-                <span
-                  style={{
-                    background: r.isPenalty ? '#F6DCD3' : '#E5EFD6',
-                    color: r.isPenalty ? '#A0402A' : '#40682A',
-                    fontWeight: 800,
-                    fontSize: 12,
-                    padding: '4px 8px',
-                    borderRadius: 999,
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  −{r.points} pts
-                </span>
-                <button onClick={() => onDeleteRedemption(r.id)} title="Eliminar canje" style={{ ...BTN_LIGHT, flex: '0 0 auto', padding: '6px 8px' }}>
-                  🗑️
-                </button>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       )}
