@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { isConceptVariableCost } from '../../shared/logic'
 import type { BalanceEntry } from '../../shared/logic'
 import type { RewardConcept } from '../../shared/types'
@@ -37,6 +37,14 @@ export function ChildActionsPanel({
   const [redeemVal, setRedeemVal] = useState('')
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
+  /** Evita que un doble click dé los puntos dos veces: la transacción de Firestore tarda un
+   *  momento y el panel no se cierra al confirmar (a propósito, para poder dar varios ajustes
+   *  seguidos), así que sin esto el segundo click entra antes de que el primero termine.
+   *  Tiene que ser un ref y no solo el estado: dos clicks en el mismo tick leen el mismo valor
+   *  de `awarding` (React no ha vuelto a renderizar todavía) y los dos pasarían el guard. El
+   *  estado se mantiene solo para poder deshabilitar el botón visualmente. */
+  const awardingRef = useRef(false)
+  const [awarding, setAwarding] = useState(false)
   const selectedConcept = concepts.find((c) => c.id === conceptId)
 
   function open(name: Exclude<PanelName, null>) {
@@ -56,15 +64,30 @@ export function ChildActionsPanel({
   }
 
   async function confirmAward() {
+    if (awardingRef.current) return
     const pts = parseInt(awardVal, 10) || 0
-    const result = await onAward(pts, awardReason)
-    if (!result.ok) {
-      setMsg({ text: result.error!, err: true })
+    // `adjustChildPoints` acepta importes con signo (lo necesita MOO2-52 para las
+    // penalizaciones), pero este panel solo da puntos: un negativo aquí restaría en silencio
+    // detrás de un botón que dice "Dar" y un ➕.
+    if (pts < 0) {
+      setMsg({ text: 'Introduce un número positivo.', err: true })
       return
     }
-    setAwardVal('')
-    setAwardReason('')
-    setMsg({ text: `Dados ${pts} pts.`, err: false })
+    awardingRef.current = true
+    setAwarding(true)
+    try {
+      const result = await onAward(pts, awardReason)
+      if (!result.ok) {
+        setMsg({ text: result.error!, err: true })
+        return
+      }
+      setAwardVal('')
+      setAwardReason('')
+      setMsg({ text: `Dados ${pts} pts.`, err: false })
+    } finally {
+      awardingRef.current = false
+      setAwarding(false)
+    }
   }
 
   async function confirmRedeem() {
@@ -126,7 +149,7 @@ export function ChildActionsPanel({
               placeholder="puntos"
               style={PANEL_INPUT_STYLE}
             />
-            <button onClick={confirmAward} style={BTN_SAVE}>
+            <button onClick={confirmAward} disabled={awarding} style={{ ...BTN_SAVE, opacity: awarding ? 0.6 : 1 }}>
               Dar
             </button>
             <button onClick={() => setPanel(null)} style={BTN_CANCEL}>
@@ -137,7 +160,9 @@ export function ChildActionsPanel({
             value={awardReason}
             onChange={(e) => setAwardReason(e.target.value)}
             placeholder="Motivo (p. ej. ayudó a recoger la mesa)"
-            style={{ ...PANEL_INPUT_STYLE, width: '100%', boxSizing: 'border-box' }}
+            // `PANEL_INPUT_STYLE` trae `flex: 1` porque el resto de campos van en una fila
+            // flex; este va suelto en el panel, así que necesita ancho propio.
+            style={{ ...PANEL_INPUT_STYLE, flex: undefined, width: '100%', boxSizing: 'border-box' }}
           />
           {msg && <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 700, color: msg.err ? '#A04A32' : '#3F6B26' }}>{msg.text}</div>}
         </div>
