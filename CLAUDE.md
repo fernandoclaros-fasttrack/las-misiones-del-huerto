@@ -7,7 +7,18 @@ for the original design spec (tokens, business rules, data model).
 
 ## Linear workflow
 
-- Team **Moon**, ticket prefix **MOO**, project "Las misiones del huerto".
+- Team **Moon Personal**, ticket prefix **MOO2**, project "Las misiones del huerto". There is
+  *also* a separate team called "Moon" with prefix MOO — don't confuse them; querying statuses
+  against "Moon" returns IDs that won't apply to these tickets.
+- **Ticket numbers were renumbered when the project moved to MOO2, and the comments were not.**
+  A `MOO-XX` reference in the source (or further down this file) is the *old* numbering and
+  generally does **not** correspond to today's `MOO2-XX`. Example: `types.ts` credits the
+  per-concept cost to "MOO-52", but MOO2-52 is "Penalize a child with a recorded reason" — the
+  cost ticket is now MOO2-22. Never resolve an old reference by swapping the prefix; look the
+  title up in Linear instead.
+- Linear's `save_issue` has silently dropped a label and an acceptance-criteria line that the
+  edit never touched. Pass `labels` explicitly on every call and re-read the returned issue to
+  check nothing else changed.
 - When implementing a story: move it to **In Progress** when starting, then to **In Review**
   (or "PR Review") once implemented and verified against production — code review only runs
   once a ticket is in that column. Once code review findings are resolved, move it straight to
@@ -41,6 +52,40 @@ without a matching risk reduction.
   to `children[].points` instead, and `acumulado` stops being touched by missions. With zero
   children, everything behaves exactly like v1 — this fallback is deliberate
   backward-compatibility, not a bug.
+- **Two point-movement records, and they are not the same thing.** `redemptions[]` is what a child
+  *spent* points on (always a deduction, tied to a configured reward concept). `adjustments[]`
+  (`PointAdjustment`, MOO2-51/52) is a one-off movement a parent made by hand, with a mandatory
+  written reason. `PointAdjustment.points` is **signed** — positive when giving points, negative
+  when taking them away — so both directions share one structure, one validation path and one
+  panel. `adjustChildPoints()` deliberately does **not** check for sufficient balance: unlike a
+  canje, a penalty may leave a child negative (product decision).
+- **Penalties are no longer reward concepts** (MOO2-52). `RewardConcept.isPenalty` and the "Es una
+  penalización" checkbox are gone; penalties are their own action. But `Redemption.isPenalty` is
+  **kept deliberately** and must not be removed: canjes recorded before MOO2-52 were genuinely
+  penalties, and rewriting them would falsify the family's history. It is live business data, not
+  just styling — `spentRedemptionsForChild()` uses it to keep old penalties out of the child's
+  "Historial de canjeos". New canjes always write `false`.
+- **`changeLog` is the single event stream for anything that moves points**, and it feeds three
+  screens. `withHistory()` in `useFamilyData.ts` wraps every points-changing mutator, fires only
+  when the total actually changes, and computes `ChangeLogEntry.deltas` — the per-child breakdown
+  (MOO2-53) — **generically**, by diffing each child's points before and after. That is why
+  missions, canjes, adjustments, manual edits and reset are all covered without any per-action
+  work, and why a new points-changing action needs to do nothing to appear in the histories.
+  `deltas` is a *list* because one action can move several children at once (a mission with two
+  participants, or a week reset). `reason` is a short child-facing string (mission name, written
+  motivo, redeemed reward) because `description` is written for the parent screen — third person
+  about the child, and it repeats the amount.
+- **Entries saved before MOO2-53 have `deltas: []`** and it cannot be reconstructed. They stay
+  visible in the parents' unfiltered history but appear in **no** child's ledger and under **no**
+  per-child filter. The parents' filter view says so explicitly rather than showing a
+  short list with no explanation. Don't try to back-fill this; the data was never recorded.
+- **Three history views, three different questions.** Parents' "Historial de cambios" (global
+  audit, filterable per child — MOO2-18/55). The child's "Mi historial de puntos" (MOO2-53: every
+  movement, with the balance it left, computed **backwards from current points** — never forwards
+  from zero, because the log doesn't start at zero and forwards would disagree with the number on
+  the child's own screen). And the child's "Historial de canjeos" (MOO2-54: only what they spent
+  points on, living at the bottom of the redeem screen). **Canjes appear in both child views on
+  purpose** — one explains the balance, the other records rewards obtained. Don't "fix" it.
 - **Mission participants** (`Mission.participants`, MOO-26): when a family has children, completing
   a mission asks which children participated (all selected by default) — each selected child gets
   the mission's **full** `points` (not split). `participants` records who was credited so
@@ -60,10 +105,15 @@ without a matching risk reduction.
   explicit selection. `isMissionVisibleTo()` in `src/shared/logic.ts` is what the kids screen
   filters by; there's no visibility gate on the parents screen, which always shows every mission.
 - **Resetear** (parents' reset button) zeroes `acumulado`, zeroes every child's points, AND sets
-  every mission across every day back to `pendiente`. It does NOT touch `redemptions` — that's a
-  log of past events, not current state.
-- **Redemption history** (`redemptions[]`) only logs per-child canjes (`redeemChildPoints`), not
-  penalties, manual point edits, or the legacy shared-counter redeem.
+  every mission across every day back to `pendiente`. It does NOT touch `redemptions`,
+  `adjustments` or `changeLog` — those are logs of past events, not current state. It *does*
+  produce a `changeLog` entry whose `deltas` are each child's points going to zero, which is
+  exactly what keeps the child's ledger arithmetic consistent across a reset without any special
+  casing. A reset is a manual action and needn't land on a Sunday, so it can split a week group in
+  the child's history; that's accepted, since the reset row itself explains the jump.
+- **`redemptions[]` only ever records canjes** (`redeemChildPoints`) — never manual point edits or
+  the legacy shared-counter redeem. Manual movements live in `adjustments[]` instead, and
+  everything that touches points is additionally logged in `changeLog` (see above).
 - **Auth**: a single Firebase Auth account (one shared password, email in `VITE_AUTH_EMAIL`)
   gates both screens — not one account per screen. Logging in on one screen authenticates the
   other automatically (same origin, same Firebase Auth session persisted in localStorage).
@@ -97,6 +147,26 @@ Always verify against the real production Firestore in a browser preview (not ju
 dev fallback) before shipping — add whatever test data is needed (children, missions, etc.),
 exercise the change, then **clean up the test data afterward** so production stays in the state
 a real user left it in.
+
+In dev, `VITE_DEV_AUTH_PASSWORD` in `.env.local` makes the app auto-sign-in on load, so no one
+has to type the shared password to verify. It is gated by `import.meta.env.DEV` and never reaches
+a production build. If a login screen appears unexpectedly, that var is missing or wrong — ask,
+don't try to work around it.
+
+This app is in daily use by a real family while you work on it, so:
+
+- **Read the current state before clicking anything that changes it.** Clicking a mission status
+  that is already active is a silent no-op (`if (status === mission.status) return`), which makes
+  it easy to think a click did nothing and "undo" it — actually undoing a real action. Points
+  deltas are the fastest way to detect that if it happens.
+- **Prefer a throwaway child** (`ZZ …`) over touching a real one, and prefer read-only checks
+  where the change allows it. When a real child is unavoidable (e.g. verifying mission credit),
+  complete then immediately un-complete — un-completing reverses exactly the recorded
+  `participants`, so it nets to zero.
+- **Check whether the family is mid-session first**: look at the newest `changeLog` timestamps and
+  actors. If entries are appearing as you work, stay read-only.
+- `changeLog` entries **cannot be deleted from the UI** by design. Test data that generates them
+  leaves a permanent trace, so keep test names obviously fake and expect the residue.
 
 ## Deploying
 
