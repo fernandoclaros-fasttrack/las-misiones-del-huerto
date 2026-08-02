@@ -314,7 +314,7 @@ export function isConceptVariableCost(concept: RewardConcept): boolean {
 
 export function addConcept(
   data: FamilyData,
-  concept: Omit<RewardConcept, 'id' | 'isPenalty' | 'isVariableCost'> & { isPenalty?: boolean; isVariableCost: boolean },
+  concept: Omit<RewardConcept, 'id' | 'isVariableCost'> & { isVariableCost: boolean },
   idSeed: number,
 ): { concepts: RewardConcept[]; id: string | null } {
   const label = concept.label.trim()
@@ -328,7 +328,6 @@ export function addConcept(
     id,
     emoji: concept.emoji,
     label,
-    isPenalty: concept.isPenalty ?? false,
     isVariableCost: concept.isVariableCost ?? false,
     ...(concept.isVariableCost ? {} : { cost }),
   }
@@ -479,7 +478,7 @@ export function redeemChildPoints(
   data: FamilyData,
   childId: string,
   points: number,
-  concept: { emoji: string; label: string; isPenalty?: boolean },
+  concept: { emoji: string; label: string },
   idSeed: number,
 ): ChildRedeemResult {
   const pts = Math.round(points) || 0
@@ -494,7 +493,8 @@ export function redeemChildPoints(
     points: pts,
     conceptEmoji: concept.emoji,
     conceptLabel: concept.label,
-    isPenalty: concept.isPenalty ?? false,
+    // Desde MOO2-52 un canje nunca es una penalización — esas son su propia acción.
+    isPenalty: false,
     timestamp: idSeed,
   }
   return { ok: true, children, redemptions: [...data.redemptions, redemption] }

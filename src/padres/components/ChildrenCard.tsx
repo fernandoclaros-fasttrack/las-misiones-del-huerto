@@ -13,7 +13,7 @@ interface Props {
   onRename: (childId: string, name: string) => void
   onRemove: (childId: string) => void
   onEditPoints: (childId: string, value: number) => void
-  onAward: (childId: string, points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
+  onAdjust: (childId: string, points: number, reason: string) => Promise<{ ok: boolean; error?: string }>
   onRedeem: (childId: string, points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
   onDeleteRedemption: (redemptionId: string) => void
   onDeleteAdjustment: (adjustmentId: string) => void
@@ -28,7 +28,7 @@ export function ChildrenCard({
   onRename,
   onRemove,
   onEditPoints,
-  onAward,
+  onAdjust,
   onRedeem,
   onDeleteRedemption,
   onDeleteAdjustment,
@@ -99,7 +99,7 @@ export function ChildrenCard({
                 concepts={concepts}
                 entries={balanceEntriesForChild(redemptions, adjustments, child.id)}
                 onEditPoints={(value) => onEditPoints(child.id, value)}
-                onAward={(points, reason) => onAward(child.id, points, reason)}
+                onAdjust={(points, reason) => onAdjust(child.id, points, reason)}
                 onRedeem={(points, concept) => onRedeem(child.id, points, concept)}
                 onDeleteRedemption={onDeleteRedemption}
                 onDeleteAdjustment={onDeleteAdjustment}

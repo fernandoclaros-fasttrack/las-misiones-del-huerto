@@ -36,9 +36,6 @@ export interface RewardConcept {
   id: string
   emoji: string
   label: string
-  /** Marca el concepto como penalización (MOO-41), para distinguirlo visualmente de una
-   *  recompensa en el historial de canjes del hijo/a. */
-  isPenalty: boolean
   /** Si el concepto pide el importe manualmente en cada canje, en vez de aplicar siempre el
    *  mismo coste (MOO-54). Ausente = concepto creado antes de MOO-54; se trata como variable o
    *  fijo según tuviera o no un `cost` configurado — ver `isConceptVariableCost()` en logic.ts,
@@ -61,8 +58,11 @@ export interface Redemption {
   points: number
   conceptEmoji: string
   conceptLabel: string
-  /** Copiado de `RewardConcept.isPenalty` en el momento del canje (MOO-41), para que el
-   *  historial pueda mostrar las penalizaciones en rojo aunque el concepto cambie después. */
+  /** Solo histórico. Cuando las penalizaciones eran un concepto de canje, esto se copiaba del
+   *  concepto para poder pintarlas en rojo aunque el concepto cambiara después. Desde MOO2-52
+   *  las penalizaciones son su propia acción (`PointAdjustment` con puntos negativos) y ningún
+   *  canje nuevo se marca así, pero el campo se conserva para que los canjes ya registrados se
+   *  sigan viendo como eran: reescribirlos sería falsear el historial de la familia. */
   isPenalty: boolean
   /** epoch ms */
   timestamp: number

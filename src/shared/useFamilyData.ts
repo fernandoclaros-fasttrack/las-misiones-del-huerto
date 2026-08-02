@@ -31,10 +31,10 @@ function nextId(): number {
  *  añadidos después de que se guardara la misión por última vez. `missionOrder`/
  *  `globalMissionOrder` que faltan se rellenan con `[]` (orden alfabético por defecto), igual
  *  que el comportamiento previo a MOO-29/MOO-30, y lo mismo con `adjustments` para documentos
- *  anteriores a MOO2-51. Conceptos/canjes guardados antes de MOO-41 no
- *  tienen `isPenalty` — se infiere de la etiqueta (contiene "penaliz") en vez de asumir `false`,
- *  para que un concepto de penalización creado a mano antes de esta funcionalidad (y sus canjes
- *  ya registrados) se sigan mostrando en rojo sin que el padre/madre tenga que recrearlo. */
+ *  anteriores a MOO2-51. Los canjes guardados antes de MOO-41 no tienen `isPenalty` — se
+ *  infiere de la etiqueta (contiene "penaliz") en vez de asumir `false`, para que las
+ *  penalizaciones ya registradas se sigan mostrando en rojo. Esto es solo para el histórico:
+ *  desde MOO2-52 las penalizaciones son su propia acción y ningún canje nuevo se marca así. */
 function normalize(raw: FamilyData): FamilyData {
   const children = raw.children ?? []
   const days = raw.days.map((day, di) => ({
@@ -49,13 +49,12 @@ function normalize(raw: FamilyData): FamilyData {
     })),
   }))
   const looksLikePenalty = (label: string) => /penaliz/i.test(label)
-  const concepts = (raw.concepts ?? []).map((c) => ({ ...c, isPenalty: c.isPenalty ?? looksLikePenalty(c.label) }))
   const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
   return {
     ...raw,
     days,
     children,
-    concepts,
+    concepts: raw.concepts ?? [],
     redemptions,
     adjustments: raw.adjustments ?? [],
     globalMissionOrder: raw.globalMissionOrder ?? [],
@@ -218,7 +217,7 @@ export function useFamilyData(actor: ChangeActor) {
       resetCounter: () =>
         run(withHistory(actor, (d) => ({ patch: logic.resetCounter(d), result: undefined }), () => 'Reseteó la semana (puntos y misiones a cero)')),
 
-      addConcept: (concept: { emoji: string; label: string; isPenalty?: boolean; isVariableCost: boolean; cost?: number }) =>
+      addConcept: (concept: { emoji: string; label: string; isVariableCost: boolean; cost?: number }) =>
         run((d) => {
           const { concepts, id } = logic.addConcept(d, concept, nextId())
           return { patch: id ? { concepts } : null, result: id }
@@ -259,7 +258,7 @@ export function useFamilyData(actor: ChangeActor) {
           ),
         ),
 
-      redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string; isPenalty?: boolean }) =>
+      redeemChildPoints: (childId: string, points: number, concept: { emoji: string; label: string }) =>
         run(
           withHistory(
             actor,
@@ -270,8 +269,7 @@ export function useFamilyData(actor: ChangeActor) {
             (d) => {
               const child = d.children.find((c) => c.id === childId)
               if (!child) return null
-              const verb = concept.isPenalty ? 'Aplicó una penalización a' : 'Canjeó puntos de'
-              return `${verb} ${child.name}: ${concept.emoji} ${concept.label} (${Math.round(points) || 0} pts)`
+              return `Canjeó puntos de ${child.name}: ${concept.emoji} ${concept.label} (${Math.round(points) || 0} pts)`
             },
           ),
         ),
