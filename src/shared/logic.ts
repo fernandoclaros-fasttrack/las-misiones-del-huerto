@@ -511,10 +511,11 @@ export interface ChildAdjustResult {
   adjustments?: PointAdjustment[]
 }
 
-/** Da puntos a un hijo/a con un motivo obligatorio (MOO2-51). `points` llega con signo, así que
- *  esta misma función sirve para el caso negativo (penalizaciones) sin duplicar validación; lo
- *  único que no se acepta es 0, que no movería el saldo pero sí dejaría una entrada en el
- *  historial. No se comprueba que haya saldo suficiente a propósito: a diferencia de un canje,
+/** Ajusta los puntos de un hijo/a con un motivo obligatorio: darlos (MOO2-51) o quitarlos
+ *  (MOO2-52). `points` llega con signo, así que las dos direcciones comparten validación en vez
+ *  de duplicarla; lo único que no se acepta es 0, que no movería el saldo pero sí dejaría una
+ *  entrada en el historial. Los mensajes de error son neutros por eso mismo: los ve tanto quien
+ *  está dando puntos como quien los está quitando. No se comprueba que haya saldo suficiente a propósito: a diferencia de un canje,
  *  el saldo puede quedar negativo (decisión de producto, MOO2-52). */
 export function adjustChildPoints(
   data: FamilyData,
@@ -527,7 +528,7 @@ export function adjustChildPoints(
   const trimmed = reason.trim()
   const child = data.children.find((c) => c.id === childId)
   if (!child) return { ok: false, error: 'No se encuentra a ese hijo/a.' }
-  if (pts === 0) return { ok: false, error: 'Introduce cuántos puntos dar.' }
+  if (pts === 0) return { ok: false, error: 'Introduce cuántos puntos.' }
   if (!trimmed) return { ok: false, error: 'Escribe el motivo.' }
   const children = data.children.map((c) => (c.id === childId ? { ...c, points: c.points + pts } : c))
   const adjustment: PointAdjustment = { id: `adj${idSeed}`, childId, points: pts, reason: trimmed, timestamp: idSeed }
