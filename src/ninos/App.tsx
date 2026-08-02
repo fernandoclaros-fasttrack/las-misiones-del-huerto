@@ -9,7 +9,7 @@ import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedeemOptions } from './components/RedeemOptions'
-import { isMissionVisibleTo, pointsDeltaFor, redemptionsForChild, sortedMissions } from '../shared/logic'
+import { isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
 import type { Mission, MissionStatus, RewardConcept } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
@@ -153,11 +153,7 @@ export default function App() {
           <RedeemOptions
             concepts={data.concepts}
             currentPoints={points}
-            // Se excluyen los canjes marcados como penalización: son registros antiguos de
-            // cuando las penalizaciones eran conceptos de canje (antes de MOO2-52), y este
-            // historial es solo "en qué me he gastado los puntos". Siguen contando en el saldo
-            // y aparecerán en "Mi historial de puntos" (MOO2-53), que sí lista todo.
-            redemptions={redemptionsForChild(data.redemptions, activeChild.id).filter((r) => !r.isPenalty)}
+            redemptions={spentRedemptionsForChild(data.redemptions, activeChild.id)}
             onRedeem={handleRedeem}
             onBack={() => setScreen('missions')}
           />
