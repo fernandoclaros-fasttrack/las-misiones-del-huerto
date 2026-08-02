@@ -504,6 +504,15 @@ export function redemptionsForChild(redemptions: Redemption[], childId: string):
   return redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
 }
 
+/** Canjes de un hijo/a entendidos como "en qué me he gastado los puntos" (MOO2-54), que es lo
+ *  que muestra su "Historial de canjeos". Deja fuera los canjes marcados como penalización:
+ *  son registros de antes de MOO2-52, cuando penalizar era canjear un concepto especial, y una
+ *  penalización no es algo que el niño/a haya elegido comprar. Siguen contando en su saldo y
+ *  aparecen en el historial de padres, que sí es el registro completo. */
+export function spentRedemptionsForChild(redemptions: Redemption[], childId: string): Redemption[] {
+  return redemptionsForChild(redemptions, childId).filter((r) => !r.isPenalty)
+}
+
 export interface ChildAdjustResult {
   ok: boolean
   error?: string

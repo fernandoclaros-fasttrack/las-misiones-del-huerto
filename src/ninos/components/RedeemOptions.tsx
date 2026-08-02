@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { isConceptVariableCost } from '../../shared/logic'
-import type { RewardConcept } from '../../shared/types'
+import type { Redemption, RewardConcept } from '../../shared/types'
+import { RedemptionHistory } from './RedemptionHistory'
 
 interface Props {
   concepts: RewardConcept[]
   currentPoints: number
+  redemptions: Redemption[]
   onRedeem: (points: number, concept: RewardConcept) => Promise<{ ok: boolean; error?: string }>
   onBack: () => void
 }
@@ -13,7 +15,7 @@ interface Props {
  *  por el panel de padres). Antes filtraba los conceptos marcados como penalización, para que
  *  un hijo no pudiera autoaplicarse una; desde MOO2-52 ya no hace falta, porque las
  *  penalizaciones dejaron de ser conceptos de canje y solo existen en la pantalla de padres. */
-export function RedeemOptions({ concepts, currentPoints, onRedeem, onBack }: Props) {
+export function RedeemOptions({ concepts, currentPoints, redemptions, onRedeem, onBack }: Props) {
   const [conceptId, setConceptId] = useState<string | null>(concepts[0]?.id ?? null)
   const [redeemVal, setRedeemVal] = useState('')
   const [msg, setMsg] = useState<{ text: string; err: boolean } | null>(null)
@@ -159,6 +161,10 @@ export function RedeemOptions({ concepts, currentPoints, onRedeem, onBack }: Pro
           )}
         </>
       )}
+
+      {/* Fuera del condicional de conceptos: aunque no quede nada que canjear, el niño/a debe
+          poder seguir viendo en qué gastó sus puntos. */}
+      <RedemptionHistory redemptions={redemptions} />
     </main>
   )
 }

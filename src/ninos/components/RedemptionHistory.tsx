@@ -2,35 +2,23 @@ import type { Redemption } from '../../shared/types'
 
 interface Props {
   redemptions: Redemption[]
-  onBack: () => void
 }
 
-export function RedemptionHistory({ redemptions, onBack }: Props) {
+/** "Historial de canjeos" (MOO2-54): en qué se ha gastado el niño/a sus puntos. Va como sección
+ *  al final de la pantalla de canjear, no como pantalla aparte, porque es donde el niño/a ya está
+ *  pensando en premios. Deliberadamente **solo** lista canjes: el desglose de todo lo que ha
+ *  movido sus puntos (misiones, puntos dados, penalizaciones) es "Mi historial de puntos"
+ *  (MOO2-53), una vista distinta que responde a otra pregunta. Los canjes salen en las dos a
+ *  propósito. */
+export function RedemptionHistory({ redemptions }: Props) {
   return (
-    <main style={{ flex: 1, padding: '8px 16px 44px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <button
-        onClick={onBack}
-        style={{
-          alignSelf: 'flex-start',
-          padding: '8px 14px',
-          borderRadius: 12,
-          border: '1px solid #EADFCB',
-          background: '#FFFDF6',
-          color: '#6E6045',
-          fontWeight: 800,
-          fontSize: 13,
-          cursor: 'pointer',
-        }}
-      >
-        ← Volver a mis misiones
-      </button>
-
-      <div style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 19, padding: '4px 6px 2px' }}>Mi historial de canjes</div>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 10 }}>
+      <div style={{ fontFamily: "'Bitter', serif", fontWeight: 600, fontSize: 19, padding: '4px 6px 2px' }}>Historial de canjeos</div>
 
       {redemptions.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 20px', color: '#9A8E77' }}>
-          <div style={{ fontSize: 40 }}>🎁</div>
-          <div style={{ marginTop: 10, fontWeight: 700, fontSize: 16 }}>Todavía no has canjeado puntos</div>
+        <div style={{ textAlign: 'center', padding: '28px 20px', color: '#9A8E77' }}>
+          <div style={{ fontSize: 34 }}>🎁</div>
+          <div style={{ marginTop: 8, fontWeight: 700, fontSize: 15 }}>Todavía no has canjeado puntos</div>
         </div>
       ) : (
         redemptions.map((r) => (
@@ -57,22 +45,24 @@ export function RedemptionHistory({ redemptions, onBack }: Props) {
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontSize: 22,
+                flex: '0 0 auto',
               }}
             >
               {r.conceptEmoji}
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{r.conceptLabel}</div>
               <div style={{ fontSize: 12.5, color: '#8A7E6B', fontWeight: 600 }}>{new Date(r.timestamp).toLocaleDateString('es-ES')}</div>
             </div>
             <div
               style={{
-                background: r.isPenalty ? '#F6DCD3' : '#E5EFD6',
-                color: r.isPenalty ? '#A0402A' : '#40682A',
+                background: '#E5EFD6',
+                color: '#40682A',
                 fontWeight: 800,
                 fontSize: 13,
                 padding: '5px 10px',
                 borderRadius: 999,
+                whiteSpace: 'nowrap',
               }}
             >
               −{r.points} pts
@@ -80,6 +70,6 @@ export function RedemptionHistory({ redemptions, onBack }: Props) {
           </div>
         ))
       )}
-    </main>
+    </section>
   )
 }
