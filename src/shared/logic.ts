@@ -1,4 +1,15 @@
-import type { Child, Day, FamilyData, Mission, MissionStatus, PointAdjustment, Redemption, RewardConcept } from './types'
+import type {
+  ChangeLogEntry,
+  Child,
+  ChildPointsDelta,
+  Day,
+  FamilyData,
+  Mission,
+  MissionStatus,
+  PointAdjustment,
+  Redemption,
+  RewardConcept,
+} from './types'
 
 /**
  * Reglas de negocio puras (ver README del handoff de diseño, sección "Reglas de negocio").
@@ -502,6 +513,88 @@ export function redeemChildPoints(
 
 export function redemptionsForChild(redemptions: Redemption[], childId: string): Redemption[] {
   return redemptions.filter((r) => r.childId === childId).sort((a, b) => b.timestamp - a.timestamp)
+}
+
+/** Una fila del historial de puntos de un hijo/a (MOO2-53). */
+export interface LedgerRow {
+  id: string
+  /** Con signo: lo que esta acción sumó o restó a *este* hijo/a. */
+  points: number
+  /** Qué pasó, en corto: nombre de misión, motivo escrito, premio canjeado… */
+  reason: string
+  /** Puntos que le quedaron al hijo/a justo después de esta acción. */
+  balanceAfter: number
+  /** epoch ms */
+  timestamp: number
+}
+
+/** Historial de puntos de un hijo/a (MOO2-53): todo lo que movió sus puntos, del más reciente al
+ *  más antiguo, con el saldo resultante en cada fila.
+ *
+ *  El saldo se calcula **hacia atrás desde los puntos actuales**, restando cada movimiento, y no
+ *  hacia delante desde cero: las entradas anteriores a MOO2-53 no tienen desglose por hijo/a y
+ *  nunca lo tendrán, así que el historial no arranca en cero y sumar hacia delante daría un saldo
+ *  que no cuadra con el número que el niño/a ve en su pantalla.
+ *
+ *  Las entradas sin motivo propio caen en `description`, que es texto de la pantalla de padres
+ *  pero sigue explicando qué pasó. */
+export function childLedger(changeLog: ChangeLogEntry[], childId: string, currentPoints: number): LedgerRow[] {
+  const mine = changeLog
+    .map((entry) => ({ entry, delta: entry.deltas.find((d) => d.childId === childId) }))
+    .filter((x): x is { entry: ChangeLogEntry; delta: ChildPointsDelta } => x.delta !== undefined)
+    .sort((a, b) => b.entry.timestamp - a.entry.timestamp)
+
+  let balance = currentPoints
+  return mine.map(({ entry, delta }) => {
+    const row: LedgerRow = {
+      id: entry.id,
+      points: delta.points,
+      reason: entry.reason ?? entry.description,
+      balanceAfter: balance,
+      timestamp: entry.timestamp,
+    }
+    balance -= delta.points
+    return row
+  })
+}
+
+/** Lunes 00:00 de la semana a la que pertenece un instante. La semana empieza en lunes para que
+ *  coincida con las pestañas de días del resto de la app (Lunes=0 … Domingo=6). */
+function startOfWeek(timestamp: number): number {
+  const d = new Date(timestamp)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d.getTime()
+}
+
+export interface LedgerWeek {
+  /** epoch ms del lunes de esa semana; sirve de key y de criterio de orden. */
+  weekStart: number
+  label: string
+  rows: LedgerRow[]
+}
+
+/** Agrupa el historial en semanas (MOO2-53), de la más reciente a la más antigua, para que la
+ *  lista siga siendo legible según crece — con las misiones dentro son varias entradas al día. */
+export function groupLedgerByWeek(rows: LedgerRow[], now: number): LedgerWeek[] {
+  const thisWeek = startOfWeek(now)
+  const weeks = new Map<number, LedgerRow[]>()
+  for (const row of rows) {
+    const key = startOfWeek(row.timestamp)
+    const bucket = weeks.get(key)
+    if (bucket) bucket.push(row)
+    else weeks.set(key, [row])
+  }
+  return [...weeks.entries()]
+    .sort((a, b) => b[0] - a[0])
+    .map(([weekStart, weekRows]) => ({
+      weekStart,
+      label:
+        weekStart === thisWeek
+          ? 'Esta semana'
+          : `Semana del ${new Date(weekStart).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}`,
+      rows: weekRows,
+    }))
 }
 
 /** Canjes de un hijo/a entendidos como "en qué me he gastado los puntos" (MOO2-54), que es lo

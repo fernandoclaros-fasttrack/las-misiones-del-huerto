@@ -89,11 +89,32 @@ export interface PointAdjustment {
  *  hay una identidad por persona (login es una única contraseña compartida, ver MOO-24). */
 export type ChangeActor = 'padre' | 'hijo'
 
+/** Cuántos puntos ganó o perdió un hijo/a concreto en una acción (MOO2-53). Una sola acción
+ *  puede mover los puntos de varios hijos a la vez — completar una misión con dos participantes,
+ *  o resetear la semana — por eso es una lista y no un único `childId`. */
+export interface ChildPointsDelta {
+  childId: string
+  /** Con signo: positivo si el hijo/a ganó puntos, negativo si los perdió. Nunca 0. */
+  points: number
+}
+
 export interface ChangeLogEntry {
   id: string
   actor: ChangeActor
-  /** Texto ya listo para mostrar (qué pasó), en español. */
+  /** Texto ya listo para mostrar (qué pasó), en español. Está escrito desde el punto de vista
+   *  del padre/madre ("Dio 7 pts a Kai: …"), que es la pantalla para la que se creó (MOO-39). */
   description: string
+  /** Desglose por hijo/a de esta acción (MOO2-53). Vacío en las entradas guardadas antes de
+   *  MOO2-53: no se puede reconstruir a quién afectaron, así que no aparecen en el historial de
+   *  ningún niño/a. Se calcula genéricamente en `withHistory()` comparando los puntos de cada
+   *  hijo/a antes y después, así que cubre misiones, canjes, ajustes, ediciones y reset sin que
+   *  cada acción tenga que acordarse de rellenarlo. */
+  deltas: ChildPointsDelta[]
+  /** Motivo corto para la pantalla del niño/a (MOO2-53): el nombre de la misión, el motivo que
+   *  escribió el padre/madre, o el premio canjeado. `description` no sirve ahí porque habla del
+   *  niño/a en tercera persona y repite los puntos, que ya se muestran aparte. Ausente en
+   *  entradas antiguas y en acciones sin un motivo mejor que la propia descripción. */
+  reason?: string
   /** epoch ms */
   timestamp: number
 }
