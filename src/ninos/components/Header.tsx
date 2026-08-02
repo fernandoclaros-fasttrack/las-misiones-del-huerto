@@ -9,10 +9,11 @@ interface Props {
   childName?: string
   onSwitchChild?: () => void
   onShowRedeem?: () => void
+  onShowPoints?: () => void
   onLogout: () => void
 }
 
-export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowRedeem, onLogout }: Props) {
+export function Header({ accent, points, pointsKey, showFloat, floatKey, floatText, floatColor, childName, onSwitchChild, onShowRedeem, onShowPoints, onLogout }: Props) {
   return (
     <header
       style={{
@@ -94,7 +95,8 @@ export function Header({ accent, points, pointsKey, showFloat, floatKey, floatTe
       <div style={{ fontSize: 13.5, opacity: 0.82, marginTop: 3, fontWeight: 600 }}>acumulados esta semana 🌻</div>
 
       {childName && (
-        <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+        // flexWrap: la fila creció a tres chips en MOO2-53 y un nombre largo la aprieta.
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
           <button
             onClick={onSwitchChild}
             style={{
@@ -131,6 +133,26 @@ export function Header({ accent, points, pointsKey, showFloat, floatKey, floatTe
               }}
             >
               🛍️ Canjear
+            </button>
+          )}
+          {onShowPoints && (
+            <button
+              onClick={onShowPoints}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '5px 10px',
+                borderRadius: 999,
+                border: 'none',
+                background: 'rgba(255,255,255,.18)',
+                color: '#F6F1E2',
+                fontWeight: 800,
+                fontSize: 12.5,
+                cursor: 'pointer',
+              }}
+            >
+              🧾 Mis puntos
             </button>
           )}
         </div>

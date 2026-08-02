@@ -3,7 +3,7 @@ import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore'
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData } from './constants'
-import type { ChangeActor, FamilyData, MissionStatus } from './types'
+import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, MissionStatus } from './types'
 import * as logic from './logic'
 
 type Patch = Partial<FamilyData> | null
@@ -58,7 +58,9 @@ function normalize(raw: FamilyData): FamilyData {
     redemptions,
     adjustments: raw.adjustments ?? [],
     globalMissionOrder: raw.globalMissionOrder ?? [],
-    changeLog: raw.changeLog ?? [],
+    // Las entradas anteriores a MOO2-53 no tienen desglose por hijo/a y no se puede
+    // reconstruir: quedan visibles en el historial de padres pero fuera del de los niños.
+    changeLog: (raw.changeLog ?? []).map((e) => ({ ...e, deltas: e.deltas ?? [] })),
   }
 }
 
@@ -82,6 +84,7 @@ function withHistory<TResult>(
   actor: ChangeActor,
   mutator: Mutator<TResult>,
   describe: (data: FamilyData, result: TResult) => string | null,
+  reasonFor?: (data: FamilyData, result: TResult) => string | undefined,
 ): Mutator<TResult> {
   return (data) => {
     const { patch, result } = mutator(data)
@@ -91,9 +94,38 @@ function withHistory<TResult>(
     const description = describe(data, result)
     if (!description) return { patch, result }
     const id = nextId()
-    const entry = { id: `chg${id}`, actor, description, timestamp: id }
+    const reason = reasonFor?.(data, result)?.trim() || undefined
+    const entry: ChangeLogEntry = {
+      id: `chg${id}`,
+      actor,
+      description,
+      deltas: childDeltas(data.children, after.children),
+      ...(reason ? { reason } : {}),
+      timestamp: id,
+    }
     return { patch: { ...patch, changeLog: [...data.changeLog, entry] }, result }
   }
+}
+
+/** Desglose por hijo/a de una acción (MOO2-53), comparando sus puntos antes y después. Se hace
+ *  aquí y no en cada acción para que cualquier cosa que mueva puntos quede registrada sin tener
+ *  que acordarse — igual que `withHistory` ya decide genéricamente si una acción es
+ *  significativa. Un hijo/a que desaparece (`removeChild`) cuenta como perder todos sus puntos:
+ *  es lo que pasó con el total, y su historial deja de existir con él de todas formas. */
+function childDeltas(before: Child[], after: Child[]): ChildPointsDelta[] {
+  const afterPoints = new Map(after.map((c) => [c.id, c.points]))
+  const deltas: ChildPointsDelta[] = []
+  for (const child of before) {
+    const points = (afterPoints.get(child.id) ?? 0) - child.points
+    if (points !== 0) deltas.push({ childId: child.id, points })
+  }
+  // Un hijo/a recién creado no aparece en `before`; hoy siempre nace con 0 puntos, pero si eso
+  // cambiara su alta contaría como una ganancia y debe quedar registrada igual.
+  const beforeIds = new Set(before.map((c) => c.id))
+  for (const child of after) {
+    if (!beforeIds.has(child.id) && child.points !== 0) deltas.push({ childId: child.id, points: child.points })
+  }
+  return deltas
 }
 
 export function useFamilyData(actor: ChangeActor) {
@@ -155,6 +187,7 @@ export function useFamilyData(actor: ChangeActor) {
               if (!mission) return null
               return mission.status === 'completada' ? `Descompletó la misión "${mission.title}"` : `Completó la misión "${mission.title}"`
             },
+            (d) => d.days[dayIdx]?.missions.find((mi) => mi.id === missionId)?.title,
           ),
         ),
 
@@ -215,7 +248,14 @@ export function useFamilyData(actor: ChangeActor) {
       resetGlobalMissionOrder: () => run((d) => ({ patch: logic.resetGlobalMissionOrder(d), result: undefined })),
 
       resetCounter: () =>
-        run(withHistory(actor, (d) => ({ patch: logic.resetCounter(d), result: undefined }), () => 'Reseteó la semana (puntos y misiones a cero)')),
+        run(
+          withHistory(
+            actor,
+            (d) => ({ patch: logic.resetCounter(d), result: undefined }),
+            () => 'Reseteó la semana (puntos y misiones a cero)',
+            () => 'Semana reseteada',
+          ),
+        ),
 
       addConcept: (concept: { emoji: string; label: string; isVariableCost: boolean; cost?: number }) =>
         run((d) => {
@@ -271,6 +311,7 @@ export function useFamilyData(actor: ChangeActor) {
               if (!child) return null
               return `Canjeó puntos de ${child.name}: ${concept.emoji} ${concept.label} (${Math.round(points) || 0} pts)`
             },
+            () => `${concept.emoji} ${concept.label}`,
           ),
         ),
 
@@ -289,6 +330,7 @@ export function useFamilyData(actor: ChangeActor) {
               const verb = pts >= 0 ? 'Dio' : 'Quitó'
               return `${verb} ${Math.abs(pts)} pts a ${child.name}: ${reason.trim()}`
             },
+            () => reason,
           ),
         ),
 

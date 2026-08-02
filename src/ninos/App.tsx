@@ -9,7 +9,8 @@ import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedeemOptions } from './components/RedeemOptions'
-import { isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
+import { PointsHistory } from './components/PointsHistory'
+import { childLedger, groupLedgerByWeek, isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
 import type { Mission, MissionStatus, RewardConcept } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
@@ -20,7 +21,7 @@ export default function App() {
   const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo')
   const [selected, setSelected] = useState(todayIndex())
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
-  const [screen, setScreen] = useState<'missions' | 'redeem'>('missions')
+  const [screen, setScreen] = useState<'missions' | 'redeem' | 'points'>('missions')
 
   const [pointsKey, setPointsKey] = useState(0)
   const [floatKey, setFloatKey] = useState(0)
@@ -146,10 +147,16 @@ export default function App() {
           childName={activeChild?.name}
           onSwitchChild={switchChild}
           onShowRedeem={hasChildren ? () => setScreen('redeem') : undefined}
+          onShowPoints={hasChildren ? () => setScreen('points') : undefined}
           onLogout={() => void logout()}
         />
 
-        {hasChildren && screen === 'redeem' && activeChild ? (
+        {hasChildren && screen === 'points' && activeChild ? (
+          <PointsHistory
+            weeks={groupLedgerByWeek(childLedger(data.changeLog, activeChild.id, activeChild.points), Date.now())}
+            onBack={() => setScreen('missions')}
+          />
+        ) : hasChildren && screen === 'redeem' && activeChild ? (
           <RedeemOptions
             concepts={data.concepts}
             currentPoints={points}
