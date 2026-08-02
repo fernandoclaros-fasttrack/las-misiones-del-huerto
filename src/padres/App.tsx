@@ -294,7 +294,7 @@ export default function App() {
         </header>
 
         {showHistory ? (
-          <ChangeHistoryView entries={data.changeLog} onBack={() => setShowHistory(false)} />
+          <ChangeHistoryView entries={data.changeLog} kids={data.children} onBack={() => setShowHistory(false)} />
         ) : (
           <>
             <div style={{ padding: '16px 16px 8px' }}>
