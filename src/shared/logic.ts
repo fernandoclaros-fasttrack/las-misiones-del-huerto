@@ -597,6 +597,36 @@ export function groupLedgerByWeek(rows: LedgerRow[], now: number): LedgerWeek[] 
     }))
 }
 
+/** Una fila del "Historial de cambios" de padres (MOO2-55). */
+export interface ChangeHistoryRow {
+  entry: ChangeLogEntry
+  /** Puntos que la acción movió para el hijo/a filtrado. Ausente cuando no hay filtro: sin
+   *  hijo/a de referencia una sola cifra no significaría nada (la acción pudo mover a varios). */
+  points?: number
+}
+
+/** Filas del historial de padres, de la más reciente a la más antigua (MOO2-55). Con `childId`
+ *  se queda solo con las acciones que movieron los puntos de ese hijo/a, y añade cuántos.
+ *
+ *  Una misma acción que movió a varios hijos aparece bajo el filtro de cada uno con su cifra
+ *  correspondiente. Sin filtro se devuelve todo tal cual, para que la vista siga comportándose
+ *  exactamente como la dejó MOO2-18. */
+export function changeHistoryRows(changeLog: ChangeLogEntry[], childId: string | null): ChangeHistoryRow[] {
+  const sorted = [...changeLog].sort((a, b) => b.timestamp - a.timestamp)
+  if (!childId) return sorted.map((entry) => ({ entry }))
+  return sorted.flatMap((entry) => {
+    const delta = entry.deltas.find((d) => d.childId === childId)
+    return delta ? [{ entry, points: delta.points }] : []
+  })
+}
+
+/** Entradas sin desglose por hijo/a: las guardadas antes de MOO2-53, que no se puede reconstruir
+ *  a quién afectaron. Quedan fuera de cualquier filtro por hijo/a, así que la vista lo avisa en
+ *  vez de dejar al padre/madre con una lista corta sin explicación. */
+export function entriesWithoutChildBreakdown(changeLog: ChangeLogEntry[]): number {
+  return changeLog.filter((e) => e.deltas.length === 0).length
+}
+
 /** Canjes de un hijo/a entendidos como "en qué me he gastado los puntos" (MOO2-54), que es lo
  *  que muestra su "Historial de canjeos". Deja fuera los canjes marcados como penalización:
  *  son registros de antes de MOO2-52, cuando penalizar era canjear un concepto especial, y una
