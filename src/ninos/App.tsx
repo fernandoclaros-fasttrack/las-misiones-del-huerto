@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
 import { useAuth } from '../shared/useAuth'
 import { LoginScreen } from '../shared/components/LoginScreen'
-import { ACCENT, todayIndex } from '../shared/constants'
+import { ACCENT, todayIndex, todayISODate } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { Header } from './components/Header'
 import { MissionCard } from './components/MissionCard'
@@ -10,7 +10,7 @@ import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
 import { RedeemOptions } from './components/RedeemOptions'
 import { PointsHistory } from './components/PointsHistory'
-import { childLedger, groupLedgerByWeek, isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
+import { childLedger, groupLedgerByWeek, isMissionActiveToday, isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
 import type { Mission, MissionStatus, RewardConcept } from '../shared/types'
 
 const ACTIVE_CHILD_KEY = 'misiones-del-huerto:active-child'
@@ -129,7 +129,8 @@ export default function App() {
   }
 
   const day = data.days[selected]
-  const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild?.id ?? null))
+  const today = todayISODate()
+  const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild?.id ?? null) && isMissionActiveToday(m, today))
   const doneCount = missions.filter((m) => m.status === 'completada').length
   const points = hasChildren ? (activeChild?.points ?? 0) : data.acumulado
 

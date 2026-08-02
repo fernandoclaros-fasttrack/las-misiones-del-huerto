@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
 import { useAuth } from '../shared/useAuth'
 import { LoginScreen } from '../shared/components/LoginScreen'
-import { ACCENT, todayIndex } from '../shared/constants'
+import { ACCENT, todayIndex, todayISODate, nextDateForWeekday, weekdayOfISODate } from '../shared/constants'
 import { DayTabs } from '../shared/components/DayTabs'
 import { Toast } from '../shared/components/Toast'
 import { ConceptsCard } from './components/ConceptsCard'
@@ -10,6 +10,7 @@ import { ChildrenCard } from './components/ChildrenCard'
 import { MissionCard } from './components/MissionCard'
 import { MissionsList } from './components/MissionsList'
 import { NewMissionForm } from './components/NewMissionForm'
+import { MissionTemplatesQuickPick } from './components/MissionTemplatesQuickPick'
 import { SettingsMenu } from './components/SettingsMenu'
 import { ChangeHistoryView } from './components/ChangeHistoryView'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
@@ -24,6 +25,9 @@ interface Draft {
   days: number[]
   /** IDs de los hijos asignados (MOO-27); irrelevante mientras no haya hijos configurados. */
   assignedTo: string[]
+  /** Si el borrador es one-off (MOO2-56/61); cuando es `true`, `oneOffDate` manda sobre `days`. */
+  isOneOff: boolean
+  oneOffDate: string
 }
 
 const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
@@ -54,6 +58,9 @@ export default function App() {
     redeemChildPoints,
     deleteRedemption,
     deleteAdjustment,
+    createMissionsFromTemplates,
+    editMissionTemplate,
+    deleteMissionTemplate,
   } = useFamilyData('padre')
 
   const [selected, setSelected] = useState(todayIndex())
@@ -72,7 +79,10 @@ export default function App() {
   const [newConceptCost, setNewConceptCost] = useState('')
 
   const [editingId, setEditingId] = useState<null | 'new' | string>(null)
-  const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [] })
+  const [draft, setDraft] = useState<Draft>({ emoji: '🌱', title: '', points: 10, days: [], assignedTo: [], isOneOff: false, oneOffDate: todayISODate() })
+  /** Misiones de la lista rápida (MOO2-58) marcadas para crear de golpe; se vacía al abrir o
+   *  cerrar el formulario de alta. */
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([])
 
   /** Orden optimista tras arrastrar/resetear (MOO-29): la transacción de Firestore tarda un
    *  poco en reflejarse en `data`, así que mientras se resuelve mostramos el orden elegido
@@ -163,24 +173,29 @@ export default function App() {
 
   function openAdd() {
     setEditingId('new')
+    setSelectedTemplateIds([])
     // Desde la vista por día se preselecciona el día que se está viendo (`selected`); desde
     // "Todo" ese valor no tiene relación con nada que el usuario haya elegido ahí, así que se
     // preselecciona el día de hoy en su lugar — sigue siendo un punto de partida editable.
-    const days = globalView ? [todayIndex()] : [selected]
-    setDraft({ emoji: '🌱', title: '', points: 10, days, assignedTo: data!.children.map((c) => c.id) })
+    const dayIdx = globalView ? todayIndex() : selected
+    setDraft({ emoji: '🌱', title: '', points: 10, days: [dayIdx], assignedTo: data!.children.map((c) => c.id), isOneOff: false, oneOffDate: nextDateForWeekday(dayIdx) })
   }
   function openEditMission(mission: Mission) {
     setEditingId(mission.id)
+    const dayIdx = mission.activeDays[0] ?? todayIndex()
     setDraft({
       emoji: mission.emoji,
       title: mission.title,
       points: mission.points,
       days: mission.activeDays,
       assignedTo: mission.assignedTo.length ? mission.assignedTo : data!.children.map((c) => c.id),
+      isOneOff: mission.oneOffDate !== undefined,
+      oneOffDate: mission.oneOffDate ?? nextDateForWeekday(dayIdx),
     })
   }
   function cancelEdit() {
     setEditingId(null)
+    setSelectedTemplateIds([])
   }
   function toggleDraftDay(i: number) {
     setDraft((d) => (d.days.includes(i) ? { ...d, days: d.days.filter((x) => x !== i) } : { ...d, days: [...d.days, i] }))
@@ -188,9 +203,25 @@ export default function App() {
   function toggleDraftChild(childId: string) {
     setDraft((d) => (d.assignedTo.includes(childId) ? { ...d, assignedTo: d.assignedTo.filter((x) => x !== childId) } : { ...d, assignedTo: [...d.assignedTo, childId] }))
   }
+  function toggleDraftOneOff() {
+    setDraft((d) => ({ ...d, isOneOff: !d.isOneOff }))
+  }
+  function setDraftOneOffDate(date: string) {
+    setDraft((d) => ({ ...d, oneOffDate: date }))
+  }
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
+    if (draft.isOneOff) {
+      const dayIdx = weekdayOfISODate(draft.oneOffDate)
+      if (editingId === 'new') {
+        await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+      } else if (editingId) {
+        await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+      }
+      setEditingId(null)
+      return
+    }
     // Si se desmarcan todos los días, hay que decidir un día de respaldo: en la vista por día
     // se usa el día que se está viendo (`selected`), pero ese mismo valor no tiene relación con
     // lo que el usuario ve en la vista global "Todo" (puede ser el de hoy, o el último día
@@ -203,9 +234,21 @@ export default function App() {
     if (editingId === 'new') {
       await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: activeDays, assignedTo: draft.assignedTo })
     } else if (editingId) {
-      await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays, assignedTo: draft.assignedTo })
+      await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays, assignedTo: draft.assignedTo, oneOffDate: undefined })
     }
     setEditingId(null)
+  }
+  function toggleTemplateSelection(id: string) {
+    setSelectedTemplateIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
+  }
+  async function handleCreateFromTemplates() {
+    if (!selectedTemplateIds.length) return
+    const dayIdx = globalView ? todayIndex() : selected
+    const count = selectedTemplateIds.length
+    await createMissionsFromTemplates(selectedTemplateIds, [dayIdx], data!.children.map((c) => c.id))
+    setSelectedTemplateIds([])
+    setEditingId(null)
+    showToast(`${count} ${count === 1 ? 'misión creada' : 'misiones creadas'}`)
   }
   async function handleDeleteMission(mission: Mission) {
     await deleteMission(selected, mission.id)
@@ -221,6 +264,8 @@ export default function App() {
       points: mission.points,
       days: mission.activeDays,
       assignedTo: mission.assignedTo,
+      isOneOff: mission.oneOffDate !== undefined,
+      oneOffDate: mission.oneOffDate ?? nextDateForWeekday(mission.activeDays[0] ?? todayIndex()),
     })
     showToast(`Misión "${mission.title}" duplicada`)
   }
@@ -243,6 +288,8 @@ export default function App() {
       points: mission.points,
       days: mission.activeDays,
       assignedTo: mission.assignedTo,
+      isOneOff: mission.oneOffDate !== undefined,
+      oneOffDate: mission.oneOffDate ?? nextDateForWeekday(mission.activeDays[0] ?? todayIndex()),
     })
     showToast(`Misión "${mission.title}" duplicada`)
   }
@@ -355,6 +402,10 @@ export default function App() {
                   draftTitle={draft.title}
                   draftPoints={draft.points}
                   draftDays={draft.days}
+                  draftIsOneOff={draft.isOneOff}
+                  onToggleDraftOneOff={toggleDraftOneOff}
+                  draftOneOffDate={draft.oneOffDate}
+                  onDraftOneOffDateChange={setDraftOneOffDate}
                   draftAssignedTo={draft.assignedTo}
                   onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
                   onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
@@ -367,6 +418,12 @@ export default function App() {
                   onAdd={openAdd}
                   onDuplicate={(m) => void handleGlobalDuplicateMission(m)}
                   onDelete={(m) => void handleGlobalDeleteMission(m)}
+                  templates={data.missionTemplates}
+                  selectedTemplateIds={selectedTemplateIds}
+                  onToggleTemplateSelect={toggleTemplateSelection}
+                  onCreateFromTemplates={() => void handleCreateFromTemplates()}
+                  onEditTemplate={(id, changes) => void editMissionTemplate(id, changes)}
+                  onDeleteTemplate={(id) => void deleteMissionTemplate(id)}
                 />
               ) : (
                 <>
@@ -376,23 +433,37 @@ export default function App() {
                   </div>
 
                   {editingId === 'new' ? (
-                    <NewMissionForm
-                      days={data.days}
-                      kids={data.children}
-                      accent={ACCENT}
-                      emoji={draft.emoji}
-                      onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
-                      selectedDays={draft.days}
-                      onToggleDay={toggleDraftDay}
-                      assignedTo={draft.assignedTo}
-                      onToggleChild={toggleDraftChild}
-                      title={draft.title}
-                      onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
-                      points={draft.points}
-                      onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
-                      onSave={saveMission}
-                      onCancel={cancelEdit}
-                    />
+                    <>
+                      <MissionTemplatesQuickPick
+                        templates={data.missionTemplates}
+                        selectedIds={selectedTemplateIds}
+                        onToggleSelect={toggleTemplateSelection}
+                        onCreateSelected={() => void handleCreateFromTemplates()}
+                        onEditTemplate={(id, changes) => void editMissionTemplate(id, changes)}
+                        onDeleteTemplate={(id) => void deleteMissionTemplate(id)}
+                      />
+                      <NewMissionForm
+                        days={data.days}
+                        kids={data.children}
+                        accent={ACCENT}
+                        emoji={draft.emoji}
+                        onEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
+                        selectedDays={draft.days}
+                        onToggleDay={toggleDraftDay}
+                        isOneOff={draft.isOneOff}
+                        onToggleOneOff={toggleDraftOneOff}
+                        oneOffDate={draft.oneOffDate}
+                        onOneOffDateChange={setDraftOneOffDate}
+                        assignedTo={draft.assignedTo}
+                        onToggleChild={toggleDraftChild}
+                        title={draft.title}
+                        onTitleChange={(title) => setDraft((d) => ({ ...d, title }))}
+                        points={draft.points}
+                        onPointsChange={(points) => setDraft((d) => ({ ...d, points }))}
+                        onSave={saveMission}
+                        onCancel={cancelEdit}
+                      />
+                    </>
                   ) : (
                     <button
                       onClick={openAdd}
@@ -429,6 +500,10 @@ export default function App() {
                           draftTitle={draft.title}
                           draftPoints={draft.points}
                           draftDays={draft.days}
+                          draftIsOneOff={draft.isOneOff}
+                          onToggleDraftOneOff={toggleDraftOneOff}
+                          draftOneOffDate={draft.oneOffDate}
+                          onDraftOneOffDateChange={setDraftOneOffDate}
                           draftAssignedTo={draft.assignedTo}
                           onDraftEmojiChange={(emoji) => setDraft((d) => ({ ...d, emoji }))}
                           onDraftTitleChange={(title) => setDraft((d) => ({ ...d, title }))}

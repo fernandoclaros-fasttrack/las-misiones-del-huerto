@@ -19,6 +19,26 @@ export interface Mission {
    *  useFamilyData.ts las trata como asignadas a todos los hijos actuales (comportamiento previo
    *  a esta funcionalidad), recalculado en cada lectura hasta que la misión se guarde de nuevo. */
   assignedTo: string[]
+  /** Fecha ISO (YYYY-MM-DD) si la misión es "one-off" (MOO2-56/61): vive en el día de la semana
+   *  que le corresponde a esa fecha (mismo mecanismo de `activeDays`, con un único día), pero
+   *  solo es visible para los hijos cuando la fecha real de hoy coincide con esta — no cada vez
+   *  que se repite ese día de la semana. Ausente = misión recurrente (comportamiento anterior).
+   *  Ver `isMissionActiveToday()` en logic.ts. */
+  oneOffDate?: string
+}
+
+/** Plantilla de misión reutilizable (MOO2-57): recuerda el título, puntos y emoji de una misión
+ *  ya creada para poder volver a añadirla sin escribirla de cero, independientemente de si esa
+ *  misión sigue programada en algún día. No guarda días activos, asignación ni fecha one-off —
+ *  esos se eligen de nuevo cada vez que se usa la plantilla para crear una misión. Editar o
+ *  borrar una plantilla (MOO2-59/60) no toca ninguna misión ya programada: son registros
+ *  independientes desde el momento en que la misión se crea (ver `upsertMissionTemplate` en
+ *  logic.ts, que solo se llama al crear una misión manualmente, nunca al editarla). */
+export interface MissionTemplate {
+  id: string
+  emoji: string
+  title: string
+  points: number
 }
 
 export interface Day {
@@ -144,6 +164,11 @@ export interface FamilyData {
    *  `redemptions`, que solo cubre canjes. Se genera en `useFamilyData.ts` (no en `logic.ts`,
    *  que se mantiene puro), comparando el total de puntos antes/después de cada acción. */
   changeLog: ChangeLogEntry[]
+  /** Lista rápida de misiones ya creadas alguna vez (MOO2-57), para reutilizarlas sin escribirlas
+   *  de cero. Se alimenta automáticamente al crear una misión manualmente (no al editarla, ni al
+   *  crearla desde esta misma lista) y se gestiona de forma independiente a las misiones
+   *  programadas: editar o borrar una entrada aquí no afecta a ninguna misión ya en un día. */
+  missionTemplates: MissionTemplate[]
 }
 
 export interface StatusMeta {

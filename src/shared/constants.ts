@@ -40,6 +40,40 @@ export function todayIndex(): number {
   return (new Date().getDay() + 6) % 7
 }
 
+/** Fecha ISO (YYYY-MM-DD) en hora local, no UTC — `toISOString()` se desplaza de día cerca de
+ *  medianoche según la zona horaria, y una misión one-off (MOO2-56) tiene que comparar contra el
+ *  día que ve la familia, no contra UTC. */
+export function toISODate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+/** Fecha ISO de hoy, en hora local (MOO2-56). Única fuente de verdad para "qué día es hoy" a
+ *  efectos de mostrar (o no) una misión one-off — ver `isMissionActiveToday()` en logic.ts. */
+export function todayISODate(): string {
+  return toISODate(new Date())
+}
+
+/** Día de la semana (Lunes=0..Domingo=6) de una fecha ISO (MOO2-56/61): el mismo criterio que
+ *  `todayIndex()`, para saber en qué `Day` vive la copia de una misión one-off. */
+export function weekdayOfISODate(iso: string): number {
+  const [y, m, day] = iso.split('-').map(Number)
+  return (new Date(y, m - 1, day).getDay() + 6) % 7
+}
+
+/** Próxima fecha ISO (incluyendo hoy) en la que cae un día de la semana dado (MOO2-56). Sirve
+ *  para preseleccionar la fecha de una misión one-off nueva a partir del día que se está viendo
+ *  al crearla — igual criterio que ya usa `openAdd()` para preseleccionar `activeDays` en las
+ *  misiones recurrentes. */
+export function nextDateForWeekday(weekdayIdx: number): string {
+  const diff = (weekdayIdx - todayIndex() + 7) % 7
+  const d = new Date()
+  d.setDate(d.getDate() + diff)
+  return toISODate(d)
+}
+
 function seedDays(): Day[] {
   const m = (id: string, emoji: string, title: string, points: number, status: MissionStatus = 'pendiente') => ({
     id,
@@ -126,5 +160,6 @@ export function seedFamilyData(): FamilyData {
     adjustments: [],
     globalMissionOrder: [],
     changeLog: [],
+    missionTemplates: [],
   }
 }

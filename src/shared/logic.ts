@@ -6,6 +6,7 @@ import type {
   FamilyData,
   Mission,
   MissionStatus,
+  MissionTemplate,
   PointAdjustment,
   Redemption,
   RewardConcept,
@@ -99,6 +100,10 @@ export interface NewMissionInput {
   dayIndices: number[]
   /** IDs de los hijos asignados (MOO-27); solo relevante cuando hay hijos configurados. */
   assignedTo: string[]
+  /** Fecha ISO si la misión es one-off (MOO2-56/61); ausente = recurrente. Cuando está presente,
+   *  `dayIndices` debe ser el día de la semana de esa fecha (un único elemento) — lo calcula
+   *  quien llama (ver `weekdayOfISODate()` en constants.ts), no esta función. */
+  oneOffDate?: string
 }
 
 export function addMission(data: FamilyData, input: NewMissionInput, idSeed: number): Pick<FamilyData, 'days'> {
@@ -108,7 +113,18 @@ export function addMission(data: FamilyData, input: NewMissionInput, idSeed: num
   const seriesId = `s${idSeed}`
   const days = data.days.map((day, di) => {
     if (!targets.includes(di)) return day
-    const mission: Mission = { id: `m${idSeed}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays: targets, participants: [], assignedTo: input.assignedTo }
+    const mission: Mission = {
+      id: `m${idSeed}-${di}`,
+      seriesId,
+      emoji: input.emoji,
+      title,
+      points,
+      status: 'pendiente',
+      activeDays: targets,
+      participants: [],
+      assignedTo: input.assignedTo,
+      ...(input.oneOffDate ? { oneOffDate: input.oneOffDate } : {}),
+    }
     return { ...day, missions: [...day.missions, mission] }
   })
   return { days }
@@ -121,12 +137,21 @@ export interface EditMissionInput {
   activeDays: number[]
   /** IDs de los hijos asignados (MOO-27); solo relevante cuando hay hijos configurados. */
   assignedTo: string[]
+  /** Fecha ISO si la misión pasa a (o sigue siendo) one-off (MOO2-56/61); `undefined` la deja
+   *  (o la vuelve a dejar) recurrente. Igual que en `NewMissionInput`, `activeDays` ya debe
+   *  contener solo el día de la semana de esa fecha cuando esto está presente. */
+  oneOffDate?: string
 }
 
 /** Edita una misión por su `seriesId` (MOO-25): los campos compartidos (emoji, título,
  *  puntos, días activos) se propagan a todas sus copias, se crean copias nuevas en los
  *  días recién seleccionados (con status 'pendiente') y se eliminan las de los días que
- *  dejan de estar activos. El status de las copias que se mantienen no se toca. */
+ *  dejan de estar activos. El status de las copias que se mantienen no se toca.
+ *
+ *  Cambiar entre one-off y recurrente (MOO2-61) reutiliza este mismo mecanismo: una misión
+ *  one-off solo tiene un día activo (el de su fecha), así que pasar de recurrente a one-off es,
+ *  para esta función, editar `activeDays` a un único día como cualquier otro cambio de días —
+ *  las copias de los días que dejan de estar activos se borran igual que siempre. */
 export function editMission(
   data: FamilyData,
   missionId: string,
@@ -158,7 +183,14 @@ export function editMission(
       }
       return {
         ...day,
-        missions: day.missions.map((mi) => (mi.seriesId === seriesId ? { ...mi, emoji: input.emoji, title, points, activeDays, assignedTo: input.assignedTo } : mi)),
+        missions: day.missions.map((mi) => {
+          if (mi.seriesId !== seriesId) return mi
+          // Firestore rechaza valores `undefined` explícitos, así que al volver a recurrente
+          // hay que quitar la clave por completo en vez de ponerla a `undefined` (destructuring
+          // en vez de spread simple con el nuevo valor).
+          const { oneOffDate: _drop, ...rest } = mi
+          return { ...rest, emoji: input.emoji, title, points, activeDays, assignedTo: input.assignedTo, ...(input.oneOffDate ? { oneOffDate: input.oneOffDate } : {}) }
+        }),
       }
     }
     if (current && !shouldHave) {
@@ -173,7 +205,18 @@ export function editMission(
       return { ...day, missions: day.missions.filter((mi) => mi.seriesId !== seriesId) }
     }
     if (!current && shouldHave) {
-      const mission: Mission = { id: `${seriesId}-${di}`, seriesId, emoji: input.emoji, title, points, status: 'pendiente', activeDays, participants: [], assignedTo: input.assignedTo }
+      const mission: Mission = {
+        id: `${seriesId}-${di}`,
+        seriesId,
+        emoji: input.emoji,
+        title,
+        points,
+        status: 'pendiente',
+        activeDays,
+        participants: [],
+        assignedTo: input.assignedTo,
+        ...(input.oneOffDate ? { oneOffDate: input.oneOffDate } : {}),
+      }
       return { ...day, missions: [...day.missions, mission] }
     }
     return day
@@ -221,6 +264,10 @@ export function duplicateMission(
       activeDays: source.activeDays,
       participants: [],
       assignedTo: source.assignedTo,
+      // Una copia de una misión one-off (MOO2-56) sigue siendo one-off para la misma fecha; si
+      // no se copiara, la copia recurriría cada semana en ese día, que no es lo que "duplicar"
+      // significa aquí.
+      ...(source.oneOffDate ? { oneOffDate: source.oneOffDate } : {}),
     }
     const originalIdx = day.missions.findIndex((mi) => mi.seriesId === source.seriesId)
     const missions =
@@ -377,8 +424,24 @@ export function isMissionVisibleTo(mission: Mission, childId: string | null): bo
   return mission.assignedTo.length === 0 || mission.assignedTo.includes(childId)
 }
 
+/** Si una misión one-off (MOO2-56) debe mostrarse hoy: solo cuando la fecha real de hoy
+ *  coincide con `oneOffDate`, no cada vez que se repite ese día de la semana — a diferencia de
+ *  una misión recurrente, que siempre está activa (`true`) independientemente del día. Es lo que
+ *  hace que una misión one-off deje de aparecer para siempre en cuanto pasa su fecha, aunque
+ *  siga viviendo en el `Day` de ese día de la semana hasta que alguien la borre. */
+export function isMissionActiveToday(mission: Mission, todayISO: string): boolean {
+  return mission.oneOffDate === undefined || mission.oneOffDate === todayISO
+}
+
 export function byTitle(a: Mission, b: Mission): number {
   return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })
+}
+
+/** Etiqueta corta de la fecha de una misión one-off (MOO2-56), p. ej. "2 ago", para el
+ *  distintivo que la diferencia de una recurrente en la tarjeta de la vista de padres. */
+export function oneOffDateLabel(iso: string): string {
+  const [y, m, day] = iso.split('-').map(Number)
+  return new Date(y, m - 1, day).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' }).replace('.', '')
 }
 
 /** Etiqueta de a qué hijos está asignada una misión; vacía si es "todos" o hay un solo hijo. */
@@ -706,4 +769,34 @@ export function deleteRedemption(data: FamilyData, redemptionId: string): Pick<F
   const children = data.children.map((c) => (c.id === redemption.childId ? { ...c, points: c.points + redemption.points } : c))
   const redemptions = data.redemptions.filter((r) => r.id !== redemptionId)
   return { children, redemptions }
+}
+
+/** Añade o refresca una entrada de la lista rápida de misiones (MOO2-57) a partir de una misión
+ *  recién creada a mano. Se identifica por título (sin distinguir mayúsculas ni espacios de
+ *  sobra) porque es el único campo con el que la familia reconocería "es la misma misión de
+ *  siempre": si ya existe, se refresca su emoji/puntos a los últimos usados en vez de duplicarla.
+ *  Solo se llama desde `addMission` cuando la misión se escribe a mano (nunca al editarla, ni al
+ *  crearla eligiéndola de esta misma lista) — ver `useFamilyData.ts`. */
+export function upsertMissionTemplate(templates: MissionTemplate[], mission: { emoji: string; title: string; points: number }, idSeed: number): MissionTemplate[] {
+  const title = mission.title.trim()
+  if (!title) return templates
+  const points = Math.max(0, Math.round(mission.points) || 0)
+  const existing = templates.find((t) => t.title.trim().toLowerCase() === title.toLowerCase())
+  if (existing) return templates.map((t) => (t.id === existing.id ? { ...t, emoji: mission.emoji, title, points } : t))
+  return [...templates, { id: `tpl${idSeed}`, emoji: mission.emoji, title, points }]
+}
+
+/** Edita el título y/o los puntos de una entrada de la lista rápida (MOO2-59). No toca ninguna
+ *  misión ya programada: una plantilla es solo el punto de partida para crear una futura. */
+export function editMissionTemplate(templates: MissionTemplate[], templateId: string, changes: { title: string; points: number }): MissionTemplate[] {
+  const title = changes.title.trim()
+  if (!title) return templates
+  const points = Math.max(0, Math.round(changes.points) || 0)
+  return templates.map((t) => (t.id === templateId ? { ...t, title, points } : t))
+}
+
+/** Quita una entrada de la lista rápida (MOO2-60): deja de sugerirse para futuras misiones, sin
+ *  afectar a ninguna misión ya programada en un día (esas viven en `Day.missions`, no aquí). */
+export function deleteMissionTemplate(templates: MissionTemplate[], templateId: string): MissionTemplate[] {
+  return templates.filter((t) => t.id !== templateId)
 }
