@@ -146,13 +146,20 @@ async function seedIfMissing(ref: DocumentReference): Promise<void> {
 
 /** `enabled` existe para no abrir la escucha antes de que haya sesión (MOO2-99): las reglas de
  *  Firestore exigen `request.auth != null`, y suscribirse sin usuario solo produce errores de
- *  permisos que además llegaban silenciados. Las pantallas pasan aquí su `isAuthed`. */
-export function useFamilyData(actor: ChangeActor, enabled = true) {
+ *  permisos que además llegaban silenciados. Las pantallas pasan aquí su `isAuthed`. Es
+ *  obligatorio a propósito: con un valor por defecto, una pantalla nueva que se olvidara de
+ *  pasarlo volvería a suscribirse sin sesión sin que nada lo delatara. */
+export function useFamilyData(actor: ChangeActor, enabled: boolean) {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled) {
+      // Al cerrar sesión no debe quedarse en memoria lo último que se leyó.
+      setData(null)
+      setLoading(true)
+      return
+    }
     if (firebaseEnabled && firestore) {
       const ref = doc(firestore, ...FAMILY_DOC_PATH)
       // Una sola tentativa de alta por montaje: si la transacción falla (sin red, permisos),
@@ -162,10 +169,13 @@ export function useFamilyData(actor: ChangeActor, enabled = true) {
         ref,
         (snap) => {
           if (!snap.exists()) {
-            // Firestore emite primero desde su caché local, y un documento que aún no está
-            // cacheado llega como "no existe" aunque esté vivo en el servidor. Tratar eso como
-            // un Firestore vacío es lo que borró los datos de la familia: mientras el snapshot
-            // venga de caché no se puede concluir nada, así que se espera al del servidor.
+            // Un snapshot de caché no prueba nada. La caché de Firestore aquí es solo en
+            // memoria (`getFirestore()` sin persistencia), así que arranca vacía en cada carga
+            // de página: si el cliente no tiene conexión, el listener emite
+            // `{exists: false, fromCache: true}` para un documento que está perfectamente vivo
+            // en el servidor. Comprobado sin red con el documento real. Tratar eso como "el
+            // Firestore está vacío" es lo que borró los datos de la familia: bastaba con abrir
+            // la app sin cobertura. Solo un snapshot del servidor permite concluir algo.
             if (snap.metadata.fromCache) return
             if (seedAttempted) return
             seedAttempted = true
