@@ -8,6 +8,7 @@ import { Header } from './components/Header'
 import { MissionCard } from './components/MissionCard'
 import { EmptyState } from './components/EmptyState'
 import { ChildPicker } from './components/ChildPicker'
+import { NoChildrenState } from './components/NoChildrenState'
 import { RedeemOptions } from './components/RedeemOptions'
 import { PointsHistory } from './components/PointsHistory'
 import { childLedger, groupLedgerByWeek, isMissionActiveToday, isMissionVisibleTo, pointsDeltaFor, sortedMissions, spentRedemptionsForChild } from '../shared/logic'
@@ -123,19 +124,26 @@ export default function App() {
     )
   }
 
-  const hasChildren = data.children.length > 0
-  const activeChildIndex = hasChildren ? data.children.findIndex((c) => c.id === activeChildId) : -1
+  // Sin ningún perfil creado no hay a quién atribuir puntos, así que tampoco se enseñan
+  // misiones: completarlas solo alimentaría un contador sin dueño (MOO2-102). Esto retira el
+  // modo v1 de esta pantalla; `data.acumulado` sigue existiendo en el documento, pero ya no se
+  // muestra en ninguna parte.
+  if (data.children.length === 0) {
+    return <NoChildrenState onLogout={() => void logout()} />
+  }
+
+  const activeChildIndex = data.children.findIndex((c) => c.id === activeChildId)
   const activeChild = activeChildIndex >= 0 ? data.children[activeChildIndex] : null
 
-  if (hasChildren && !activeChild) {
+  if (!activeChild) {
     return <ChildPicker accent={ACCENT} kids={data.children} onSelect={selectChild} />
   }
 
   const day = data.days[selected]
   const today = todayISODate()
-  const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild?.id ?? null) && isMissionActiveToday(m, today))
+  const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild.id) && isMissionActiveToday(m, today))
   const doneCount = missions.filter((m) => m.status === 'completada').length
-  const points = hasChildren ? (activeChild?.points ?? 0) : data.acumulado
+  const points = activeChild.points
 
   return (
     <div style={{ minHeight: '100vh', background: '#EFE7D4', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
@@ -148,19 +156,19 @@ export default function App() {
           floatKey={floatKey}
           floatText={floatText}
           floatColor={floatColor}
-          childName={activeChild?.name}
+          childName={activeChild.name}
           onSwitchChild={switchChild}
-          onShowRedeem={hasChildren ? () => setScreen('redeem') : undefined}
-          onShowPoints={hasChildren ? () => setScreen('points') : undefined}
+          onShowRedeem={() => setScreen('redeem')}
+          onShowPoints={() => setScreen('points')}
           onLogout={() => void logout()}
         />
 
-        {hasChildren && screen === 'points' && activeChild ? (
+        {screen === 'points' ? (
           <PointsHistory
             weeks={groupLedgerByWeek(childLedger(data.changeLog, activeChild.id, activeChild.points), Date.now())}
             onBack={() => setScreen('missions')}
           />
-        ) : hasChildren && screen === 'redeem' && activeChild ? (
+        ) : screen === 'redeem' ? (
           <RedeemOptions
             concepts={data.concepts}
             currentPoints={points}
@@ -186,7 +194,7 @@ export default function App() {
                   mission={m}
                   kids={data.children}
                   onSetStatus={(status, participantIds) =>
-                    handleSetStatus(m, status, participantIds, activeChild?.id ?? null, data.children.map((c) => c.id))
+                    handleSetStatus(m, status, participantIds, activeChild.id, data.children.map((c) => c.id))
                   }
                 />
               ))}

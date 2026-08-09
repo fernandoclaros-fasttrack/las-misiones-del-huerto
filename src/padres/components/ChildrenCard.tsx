@@ -146,9 +146,24 @@ export function ChildrenCard({
         )}
       </div>
 
+      {/* El texto anterior remitía al contador compartido "de arriba", que MOO2-24 ya había
+          retirado de esta pantalla. Desde MOO2-102 la pantalla de niños tampoco lo enseña, así
+          que sin hijos la app no sirve para nada y hay que decirlo con todas las letras. */}
       {kids.length === 0 && editingId === null && (
-        <div style={{ marginTop: 2, fontSize: 12.5, color: '#8A7E6B' }}>
-          Sin hijos configurados: los puntos se siguen acumulando en el contador compartido de arriba.
+        <div
+          style={{
+            marginTop: 10,
+            padding: '10px 12px',
+            borderRadius: 12,
+            background: '#FBEFD8',
+            border: '1px solid #E8D3A8',
+            fontSize: 12.5,
+            color: '#6E5A2E',
+            lineHeight: 1.45,
+          }}
+        >
+          <strong>Todavía no has creado ningún hijo/a.</strong> Hasta que lo hagas, la pantalla de los niños no muestra
+          misiones ni puntos: no hay a quién asignárselos.
         </div>
       )}
     </div>
