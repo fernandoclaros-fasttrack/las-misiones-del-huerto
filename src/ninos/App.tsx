@@ -18,7 +18,10 @@ const AUTH_EMAIL = import.meta.env.VITE_AUTH_EMAIL as string
 
 export default function App() {
   const { ready, isAuthed, login, logout, resetPassword } = useAuth()
-  const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo')
+  // `isAuthed` gatea la escucha de Firestore (MOO2-99): los hooks corren siempre, también en los
+  // renders en los que más abajo se devuelve la pantalla de login, así que sin esto la
+  // suscripción se abría sin sesión.
+  const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo', isAuthed)
   const [selected, setSelected] = useState(todayIndex())
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
   const [screen, setScreen] = useState<'missions' | 'redeem' | 'points'>('missions')

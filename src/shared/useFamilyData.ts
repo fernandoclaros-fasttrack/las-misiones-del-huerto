@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { doc, onSnapshot, runTransaction, setDoc } from 'firebase/firestore'
+import { doc, onSnapshot, runTransaction, type DocumentReference } from 'firebase/firestore'
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData } from './constants'
@@ -130,28 +130,66 @@ function childDeltas(before: Child[], after: Child[]): ChildPointsDelta[] {
   return deltas
 }
 
-export function useFamilyData(actor: ChangeActor) {
+/** Alta del documento la primera vez que se usa la app contra un Firestore vacío (MOO2-99).
+ *  Va en una transacción y no en un `setDoc` suelto por una razón concreta: la transacción
+ *  siempre lee del servidor, así que el `tx.set` solo llega a ejecutarse si el documento
+ *  realmente no existe. Un `setDoc` incondicional, en cambio, sustituye lo que hubiera —
+ *  que es exactamente cómo se perdieron los datos de la familia el 7/8/2026. */
+async function seedIfMissing(ref: DocumentReference): Promise<void> {
+  if (!firestore) return
+  await runTransaction(firestore, async (tx) => {
+    const snap = await tx.get(ref)
+    if (snap.exists()) return
+    tx.set(ref, seedFamilyData())
+  })
+}
+
+/** `enabled` existe para no abrir la escucha antes de que haya sesión (MOO2-99): las reglas de
+ *  Firestore exigen `request.auth != null`, y suscribirse sin usuario solo produce errores de
+ *  permisos que además llegaban silenciados. Las pantallas pasan aquí su `isAuthed`. */
+export function useFamilyData(actor: ChangeActor, enabled = true) {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!enabled) return
     if (firebaseEnabled && firestore) {
       const ref = doc(firestore, ...FAMILY_DOC_PATH)
-      const unsub = onSnapshot(ref, (snap) => {
-        if (!snap.exists()) {
-          void setDoc(ref, seedFamilyData())
-          return
-        }
-        setData(normalize(snap.data() as FamilyData))
-        setLoading(false)
-      })
+      // Una sola tentativa de alta por montaje: si la transacción falla (sin red, permisos),
+      // el listener seguirá emitiendo y no tiene sentido reintentarla en bucle.
+      let seedAttempted = false
+      const unsub = onSnapshot(
+        ref,
+        (snap) => {
+          if (!snap.exists()) {
+            // Firestore emite primero desde su caché local, y un documento que aún no está
+            // cacheado llega como "no existe" aunque esté vivo en el servidor. Tratar eso como
+            // un Firestore vacío es lo que borró los datos de la familia: mientras el snapshot
+            // venga de caché no se puede concluir nada, así que se espera al del servidor.
+            if (snap.metadata.fromCache) return
+            if (seedAttempted) return
+            seedAttempted = true
+            void seedIfMissing(ref).catch((err) => console.error('No se pudo crear el documento inicial:', err))
+            return
+          }
+          setData(normalize(snap.data() as FamilyData))
+          setLoading(false)
+        },
+        (err) => {
+          // Sin este manejador, un fallo de permisos se tragaba entero. La pantalla se queda
+          // igualmente en "Cargando misiones…" (se renderiza con `loading || !data`, y sin datos
+          // no hay nada que enseñar), pero al menos el motivo queda en consola. Convertir esto en
+          // un estado de error visible es otro ticket.
+          console.error('Error leyendo los datos de la familia:', err)
+        },
+      )
       return unsub
     }
     return localStore.subscribe((d) => {
       setData(normalize(d))
       setLoading(false)
     })
-  }, [])
+  }, [enabled])
 
   const run = useCallback(async <TResult,>(mutator: Mutator<TResult>): Promise<TResult> => {
     if (firebaseEnabled && firestore) {
@@ -159,6 +197,11 @@ export function useFamilyData(actor: ChangeActor) {
       let result!: TResult
       await runTransaction(firestore, async (tx) => {
         const snap = await tx.get(ref)
+        // No debería ocurrir (para llegar aquí hay que estar viendo datos en pantalla), pero si
+        // ocurre hay que abortar en vez de seguir: `normalize(undefined)` reventaba con un
+        // TypeError críptico, y escribir aquí un documento nuevo sería reintroducir el borrado
+        // que arregla MOO2-99.
+        if (!snap.exists()) throw new Error('El documento de la familia no existe: no se aplica ningún cambio')
         const current = normalize(snap.data() as FamilyData)
         const { patch, result: r } = mutator(current)
         result = r
