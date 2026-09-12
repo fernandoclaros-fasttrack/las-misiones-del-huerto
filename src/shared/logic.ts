@@ -433,6 +433,24 @@ export function isMissionActiveToday(mission: Mission, todayISO: string): boolea
   return mission.oneOffDate === undefined || mission.oneOffDate === todayISO
 }
 
+/** Si una misión sigue siendo útil en el panel de padres (MOO2-167): una recurrente siempre lo
+ *  es, y una one-off (MOO2-56) solo mientras su fecha sea hoy o futura. Es una regla **distinta**
+ *  de `isMissionActiveToday()`, que es la de la pantalla de niños: ahí una one-off se ve solo el
+ *  día exacto, porque al niño le sobra lo que no toca hoy; aquí el padre necesita seguir viendo
+ *  la que ha programado para el sábado que viene, para poder editarla o borrarla antes de que
+ *  llegue. Lo que decide es la fecha y nada más — una one-off pasada que nadie llegó a marcar
+ *  como hecha desaparece igual, porque el día ya no vuelve.
+ *
+ *  Las fechas son ISO (YYYY-MM-DD) y se comparan como texto a propósito: en ese formato el orden
+ *  alfabético y el cronológico son el mismo, así que no hace falta construir ningún `Date` (que
+ *  además se desplazaría a UTC — ver `toISODate()` en constants.ts).
+ *
+ *  Ocultar no es borrar: la misión sigue viviendo en su `Day`, así que el historial de puntos y
+ *  quién la completó se mantienen intactos. */
+export function isMissionCurrentForParents(mission: Mission, todayISO: string): boolean {
+  return mission.oneOffDate === undefined || mission.oneOffDate >= todayISO
+}
+
 export function byTitle(a: Mission, b: Mission): number {
   return a.title.localeCompare(b.title, 'es', { sensitivity: 'base' })
 }
