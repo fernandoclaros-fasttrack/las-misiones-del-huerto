@@ -96,6 +96,24 @@ export default function App() {
    *  guarda `seriesId`, no `id` de misión. */
   const [pendingGlobalOrder, setPendingGlobalOrder] = useState<string[] | null>(null)
 
+  /** Qué día es hoy, para el filtro de las misiones puntuales (MOO2-167). No puede calcularse
+   *  en cada render y quedarse ahí: esta app vive en la tablet de la cocina, así que el panel
+   *  cruza la medianoche abierto y sin repintarse. Con la fecha congelada, la lista seguiría
+   *  enseñando una puntual de ayer y `saveMission`, que sí mira el día real, la rechazaría con
+   *  un "esa fecha ya ha pasado" sobre una tarjeta que se ve perfectamente al día. Las dos
+   *  mitades leen de aquí, así que no pueden discrepar. Se refresca al volver a la pestaña y
+   *  con una comprobación por minuto, y solo repinta el día que el valor cambia de verdad. */
+  const [today, setToday] = useState(todayISODate)
+  useEffect(() => {
+    const sync = () => setToday((prev) => (todayISODate() === prev ? prev : todayISODate()))
+    const timer = window.setInterval(sync, 60_000)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [])
+
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
   useEffect(() => () => {
@@ -132,7 +150,6 @@ export default function App() {
   const day = data.days[selected]
   // Las one-off pasadas dejan de listarse aquí (MOO2-167): siguen guardadas en su `Day`, pero ya
   // no son accionables y mezcladas con las recurrentes impedían ver de un vistazo qué se repite.
-  const today = todayISODate()
   const rawMissions = (day ? sortedMissions(day) : []).filter((m) => isMissionCurrentForParents(m, today))
   const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
   const missions =
@@ -226,8 +243,13 @@ export default function App() {
       // Y una fecha ya pasada crearía una misión que nace invisible (MOO2-167): el panel ya no
       // lista las puntuales pasadas, así que un año mal tecleado dejaría una misión que no se
       // puede ni corregir ni borrar desde ninguna pantalla. El `min` de los dos selectores guía
-      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea.
-      if (draft.oneOffDate < todayISODate()) {
+      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea. Mide contra el
+      // día real y no contra el `today` pintado, porque es la última defensa contra una misión
+      // invisible; si resulta que el panel llevaba abierto desde ayer, pone la lista al día en
+      // el mismo gesto, para que el aviso no salga sobre una tarjeta que aún se ve vigente.
+      const realToday = todayISODate()
+      if (realToday !== today) setToday(realToday)
+      if (draft.oneOffDate < realToday) {
         showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
         return
       }
