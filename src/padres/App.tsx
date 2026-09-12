@@ -117,22 +117,28 @@ export default function App() {
   /** Y si el día cambia con el formulario de alta abierto, la fecha que ese formulario traía
    *  puesta sola (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al
    *  guardar saltaría un "esa fecha ya ha pasado" sobre algo que el usuario no tecleó. Se
-   *  adelanta al nuevo día, y con dos condiciones que no son de adorno:
+   *  adelanta al nuevo día. Lo que decide no es si es un alta, sino **de quién es esa fecha**:
    *
-   *  - **Solo al alta.** Sobre la ficha de una misión que ya existe, esto reescribiría su fecha
-   *    real: al guardar, la misión se mudaría de día de la semana sola, y si estaba completada
-   *    `editMission` borra la copia del día viejo y **descuenta los puntos ya dados a los niños**.
-   *    Dejarse una ficha abierta por la noche no puede despagar una tarea hecha.
-   *  - **Solo si la fecha sigue siendo la que puso el formulario** (el "hoy" de antes), no
-   *    cualquier fecha pasada: una que el usuario haya tecleado mal se queda como está, para que
-   *    el aviso hable de lo que él escribió y no de lo que le hemos cambiado por detrás. */
+   *  - Si es la que puso el formulario (el "hoy" de antes), se adelanta. Pasa en el alta y
+   *    también al convertir una misión recurrente en puntual, que rellena la fecha igual.
+   *  - Si es la fecha que la misión ya tenía guardada, no se toca jamás. Reescribirla haría que
+   *    al guardar la misión se mudara sola de día de la semana, y si estaba completada
+   *    `editMission` borra la copia del día viejo y **descuenta los puntos ya dados a los
+   *    niños**. Dejarse una ficha abierta por la noche no puede despagar una tarea hecha.
+   *
+   *  Una fecha pasada tecleada a mano no la alcanza esto, salvo que sea exactamente el día de
+   *  ayer, que es indistinguible de la que puso el formulario; cualquier otra sigue su camino
+   *  hasta el aviso de `saveMission`. */
   const ayerRef = useRef(today)
   useEffect(() => {
     const previo = ayerRef.current
     ayerRef.current = today
     if (previo === today) return
-    setDraft((d) => (editingId === 'new' && d.oneOffDate === previo ? { ...d, oneOffDate: today } : d))
-  }, [today, editingId])
+    const suya = editingId && editingId !== 'new'
+      ? data?.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.oneOffDate
+      : undefined
+    setDraft((d) => (d.oneOffDate === previo && d.oneOffDate !== suya ? { ...d, oneOffDate: today } : d))
+  }, [today, editingId, data])
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
@@ -271,20 +277,20 @@ export default function App() {
       // ve. Lo que sigue son las dos mitades de la misma regla, alta y edición.
       const realToday = todayISODate()
       if (realToday !== today) setToday(realToday)
-      // **Alta**: la fecha que puso el formulario al abrirse (hoy) se mantiene al día, aunque el
-      // gesto llegue antes que el refresco. Así una misión nueva nunca nace en el pasado, que es
-      // lo que la haría invisible, y sin echarle la culpa al usuario por una fecha que no eligió.
-      const fecha = editingId === 'new' && draft.oneOffDate === today ? realToday : draft.oneOffDate
-      // **Edición**: la fecha de una misión que ya existe no se toca nunca, y por eso se la deja
-      // volver a guardar tal cual aunque ya haya pasado. Rechazarla obligaría a reprogramarla
-      // para poder corregirle el título, y mover de día una misión completada hace que
-      // `editMission` borre su copia y **descuente los puntos ya dados a los niños**.
+      // La fecha que la misión ya tenía guardada, si se está editando una. Es lo que distingue
+      // "esta fecha la eligió el usuario o la puso la misión" de "la rellenó el formulario".
       const suFechaDeAntes = editingId && editingId !== 'new'
         ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.oneOffDate
         : undefined
-      // Lo que sí se rechaza en ambos casos es una fecha pasada elegida a mano: crearía (o
-      // dejaría) una misión que no se puede ni ver ni corregir. El `min` de los dos selectores
-      // guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea.
+      // Una fecha puesta por el formulario que se ha quedado en ayer se adelanta también aquí,
+      // no solo en el refresco por minuto: entre la medianoche y el minuto siguiente hay un
+      // hueco, y guardar dentro de él devolvía un aviso sobre una fecha que nadie eligió.
+      const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes ? realToday : draft.oneOffDate
+      // Y la fecha de una misión que ya existe se deja volver a guardar tal cual aunque ya haya
+      // pasado: rechazarla obligaría a reprogramarla solo para corregirle el título, con el
+      // descuento de puntos que eso arrastra. Lo que sí se rechaza es una fecha pasada elegida a
+      // mano, que dejaría una misión que no se puede ni ver ni corregir. El `min` de los dos
+      // selectores guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea.
       if (fecha < realToday && fecha !== suFechaDeAntes) {
         showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
         return
