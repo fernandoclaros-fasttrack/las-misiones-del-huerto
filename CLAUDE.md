@@ -157,7 +157,10 @@ without a matching risk reduction.
   is the parents' half, applied in `padres/App.tsx` to both the day tab and the "Todo" view.
   A past one-off is only *hidden*, never deleted: it stays in its `Day` so the points history and
   its recorded `participants` stay intact, which also means those missions accumulate in the
-  document with no way to purge them from the UI.
+  document with no way to purge them from the UI. **That is also why a one-off can no longer be
+  saved with a date in the past**: it would be born invisible to both screens, unfixable and
+  undeletable. Both date inputs carry `min={todayISODate()}` and `saveMission` re-checks it,
+  because a native date input still accepts a typed value below its `min`.
   Switching a mission between one-off and recurring (MOO2-61) is *not* special-cased in
   `editMission` — it's just an edit to `activeDays` down to one day, same as any other day-selection
   change; only the `oneOffDate` field itself needs explicit handling. Firestore rejects `undefined`

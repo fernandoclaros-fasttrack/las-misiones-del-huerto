@@ -223,6 +223,14 @@ export default function App() {
       // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
       // editar, eso borraría la única copia existente sin crear una de repuesto.
       if (!draft.oneOffDate) return
+      // Y una fecha ya pasada crearía una misión que nace invisible (MOO2-167): el panel ya no
+      // lista las puntuales pasadas, así que un año mal tecleado dejaría una misión que no se
+      // puede ni corregir ni borrar desde ninguna pantalla. El `min` de los dos selectores guía
+      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea.
+      if (draft.oneOffDate < todayISODate()) {
+        showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
+        return
+      }
       const dayIdx = weekdayOfISODate(draft.oneOffDate)
       if (editingId === 'new') {
         await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })

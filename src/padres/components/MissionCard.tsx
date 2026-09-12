@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE, WEEKDAY_INITIALS } from '../../shared/constants'
+import { EMOJI_PALETTE, WEEKDAY_INITIALS, todayISODate } from '../../shared/constants'
 import { assignedToLabel, oneOffDateLabel } from '../../shared/logic'
 import type { Child, Day, Mission } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, ICON_BTN, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
@@ -98,7 +98,8 @@ export function MissionCard({
         {draftIsOneOff ? (
           <>
             <div style={{ fontSize: 12.5, fontWeight: 800, color: '#7C6E52', margin: '12px 0 6px' }}>¿Qué día?</div>
-            <input type="date" value={draftOneOffDate} onChange={(e) => onDraftOneOffDateChange(e.target.value)} style={INPUT_STYLE} />
+            {/* `min` de hoy, por lo mismo que en NewMissionForm (MOO2-167). */}
+            <input type="date" min={todayISODate()} value={draftOneOffDate} onChange={(e) => onDraftOneOffDateChange(e.target.value)} style={INPUT_STYLE} />
           </>
         ) : (
           <>

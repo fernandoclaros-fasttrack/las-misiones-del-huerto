@@ -1,5 +1,5 @@
 import { EmojiPicker } from '../../shared/components/EmojiPicker'
-import { EMOJI_PALETTE } from '../../shared/constants'
+import { EMOJI_PALETTE, todayISODate } from '../../shared/constants'
 import type { Child, Day } from '../../shared/types'
 import { BTN_CANCEL, BTN_SAVE, INPUT_STYLE, NUMBER_INPUT_STYLE } from '../styles'
 
@@ -74,7 +74,10 @@ export function NewMissionForm({
       {isOneOff ? (
         <>
           <div style={{ fontSize: 12.5, fontWeight: 800, color: '#7C6E52', marginBottom: 6 }}>¿Qué día?</div>
-          <input type="date" value={oneOffDate} onChange={(e) => onOneOffDateChange(e.target.value)} style={{ ...INPUT_STYLE, marginBottom: 12 }} />
+          {/* `min` de hoy (MOO2-167): una puntual con fecha pasada ya no se listaría en el panel,
+              así que no se puede ni corregir ni borrar. `saveMission` lo vuelve a comprobar, porque
+              el navegador deja teclear una fecha por debajo del `min`. */}
+          <input type="date" min={todayISODate()} value={oneOffDate} onChange={(e) => onOneOffDateChange(e.target.value)} style={{ ...INPUT_STYLE, marginBottom: 12 }} />
         </>
       ) : (
         <>
