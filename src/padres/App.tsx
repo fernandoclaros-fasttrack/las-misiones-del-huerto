@@ -114,6 +114,14 @@ export default function App() {
     }
   }, [])
 
+  /** Y si el día cambia con un formulario abierto, la fecha que el formulario traía puesta sola
+   *  (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al guardar saltaría
+   *  un "esa fecha ya ha pasado" sobre algo que el usuario no tecleó. Se adelanta al nuevo hoy.
+   *  Solo puede alcanzar a una fecha ya pasada: el formulario no deja elegir ninguna. */
+  useEffect(() => {
+    setDraft((d) => (d.oneOffDate && d.oneOffDate < today ? { ...d, oneOffDate: today } : d))
+  }, [today])
+
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
   useEffect(() => () => {
@@ -152,7 +160,8 @@ export default function App() {
   // no son accionables y mezcladas con las recurrentes impedían ver de un vistazo qué se repite.
   // Excepción: la tarjeta que se está editando no se filtra nunca. Si la puntual abierta dejara
   // de pasar el filtro al cambiar el día, el formulario se desmontaría con lo tecleado dentro y
-  // esa misión ya no se podría reprogramar ni borrar desde ninguna pantalla.
+  // sin decir nada. Salva la edición en curso y deja reprogramar la misión a una fecha futura;
+  // al cerrar el formulario vuelve a esconderse, como cualquier otra puntual pasada.
   const seListaEnPadres = (m: Mission) => isMissionCurrentForParents(m, today) || m.id === editingId
   const rawMissions = (day ? sortedMissions(day) : []).filter(seListaEnPadres)
   const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
