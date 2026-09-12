@@ -125,6 +125,9 @@ export default function App() {
    *    al guardar la misión se mudara sola de día de la semana, y si estaba completada
    *    `editMission` borra la copia del día viejo y **descuenta los puntos ya dados a los
    *    niños**. Dejarse una ficha abierta por la noche no puede despagar una tarea hecha.
+   *  - Y sobre una misión **ya completada** no se adelanta nada, venga la fecha de donde venga:
+   *    ahí el adelanto es justo lo que la mudaría de día. Se prefiere el aviso de `saveMission`
+   *    y que la fecha nueva la elija una persona.
    *
    *  Una fecha pasada tecleada a mano no la alcanza esto, salvo que sea exactamente el día de
    *  ayer, que es indistinguible de la que puso el formulario; cualquier otra sigue su camino
@@ -135,9 +138,10 @@ export default function App() {
     ayerRef.current = today
     if (previo === today) return
     const suya = editingId && editingId !== 'new'
-      ? data?.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.oneOffDate
+      ? data?.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)
       : undefined
-    setDraft((d) => (d.oneOffDate === previo && d.oneOffDate !== suya ? { ...d, oneOffDate: today } : d))
+    const intocable = suya?.oneOffDate === previo || suya?.status === 'completada'
+    setDraft((d) => (d.oneOffDate === previo && !intocable ? { ...d, oneOffDate: today } : d))
   }, [today, editingId, data])
 
   const [toast, setToast] = useState<string | null>(null)
@@ -279,13 +283,19 @@ export default function App() {
       if (realToday !== today) setToday(realToday)
       // La fecha que la misión ya tenía guardada, si se está editando una. Es lo que distingue
       // "esta fecha la eligió el usuario o la puso la misión" de "la rellenó el formulario".
-      const suFechaDeAntes = editingId && editingId !== 'new'
-        ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.oneOffDate
+      const misionEditada = editingId && editingId !== 'new'
+        ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)
         : undefined
+      const suFechaDeAntes = misionEditada?.oneOffDate
       // Una fecha puesta por el formulario que se ha quedado en ayer se adelanta también aquí,
       // no solo en el refresco por minuto: entre la medianoche y el minuto siguiente hay un
       // hueco, y guardar dentro de él devolvía un aviso sobre una fecha que nadie eligió.
-      const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes ? realToday : draft.oneOffDate
+      // Nunca sobre una misión ya completada: adelantarla la mudaría de día de la semana, y a
+      // una completada eso le borra la copia y **le quita a los niños los puntos ya dados**.
+      // Ahí es mejor el aviso, y que la fecha nueva la elija una persona.
+      const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes && misionEditada?.status !== 'completada'
+        ? realToday
+        : draft.oneOffDate
       // Y la fecha de una misión que ya existe se deja volver a guardar tal cual aunque ya haya
       // pasado: rechazarla obligaría a reprogramarla solo para corregirle el título, con el
       // descuento de puntos que eso arrastra. Lo que sí se rechaza es una fecha pasada elegida a
