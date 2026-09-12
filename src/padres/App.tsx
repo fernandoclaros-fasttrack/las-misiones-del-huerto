@@ -265,24 +265,35 @@ export default function App() {
       // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
       // editar, eso borraría la única copia existente sin crear una de repuesto.
       if (!draft.oneOffDate) return
-      // Y una fecha ya pasada crearía una misión que nace invisible (MOO2-167): el panel ya no
-      // lista las puntuales pasadas, así que un año mal tecleado dejaría una misión que no se
-      // puede ni corregir ni borrar desde ninguna pantalla. El `min` de los dos selectores guía
-      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea. Mide contra el
-      // día real y no contra el `today` pintado, porque es la última defensa contra una misión
-      // invisible; si resulta que el panel llevaba abierto desde ayer, pone la lista al día en
-      // el mismo gesto, para que el aviso no salga sobre una tarjeta que aún se ve vigente.
+      // Se mide contra el día real y no contra el `today` pintado: el panel puede llevar abierto
+      // desde ayer y el minuto del reloj que lo refresca puede no haber saltado todavía. De paso
+      // pone la lista al día, para que nada de lo que salga a continuación contradiga lo que se
+      // ve. Lo que sigue son las dos mitades de la misma regla, alta y edición.
       const realToday = todayISODate()
       if (realToday !== today) setToday(realToday)
-      if (draft.oneOffDate < realToday) {
+      // **Alta**: la fecha que puso el formulario al abrirse (hoy) se mantiene al día, aunque el
+      // gesto llegue antes que el refresco. Así una misión nueva nunca nace en el pasado, que es
+      // lo que la haría invisible, y sin echarle la culpa al usuario por una fecha que no eligió.
+      const fecha = editingId === 'new' && draft.oneOffDate === today ? realToday : draft.oneOffDate
+      // **Edición**: la fecha de una misión que ya existe no se toca nunca, y por eso se la deja
+      // volver a guardar tal cual aunque ya haya pasado. Rechazarla obligaría a reprogramarla
+      // para poder corregirle el título, y mover de día una misión completada hace que
+      // `editMission` borre su copia y **descuente los puntos ya dados a los niños**.
+      const suFechaDeAntes = editingId && editingId !== 'new'
+        ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)?.oneOffDate
+        : undefined
+      // Lo que sí se rechaza en ambos casos es una fecha pasada elegida a mano: crearía (o
+      // dejaría) una misión que no se puede ni ver ni corregir. El `min` de los dos selectores
+      // guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea.
+      if (fecha < realToday && fecha !== suFechaDeAntes) {
         showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
         return
       }
-      const dayIdx = weekdayOfISODate(draft.oneOffDate)
+      const dayIdx = weekdayOfISODate(fecha)
       if (editingId === 'new') {
-        await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+        await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
       } else if (editingId) {
-        await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+        await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
       }
       setEditingId(null)
       return
