@@ -15,7 +15,7 @@ import { SettingsMenu } from './components/SettingsMenu'
 import { ChangeHistoryView } from './components/ChangeHistoryView'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
-import { sortedMissions, sortedMissionSeries, byTitle } from '../shared/logic'
+import { sortedMissions, sortedMissionSeries, byTitle, isMissionCurrentForParents } from '../shared/logic'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -130,7 +130,10 @@ export default function App() {
   }
 
   const day = data.days[selected]
-  const rawMissions = day ? sortedMissions(day) : []
+  // Las one-off pasadas dejan de listarse aquí (MOO2-167): siguen guardadas en su `Day`, pero ya
+  // no son accionables y mezcladas con las recurrentes impedían ver de un vistazo qué se repite.
+  const today = todayISODate()
+  const rawMissions = (day ? sortedMissions(day) : []).filter((m) => isMissionCurrentForParents(m, today))
   const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
   const missions =
     pendingOrder && pendingOrder.dayIdx === selected
@@ -138,7 +141,7 @@ export default function App() {
       : rawMissions
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
-  const rawGlobalMissions = sortedMissionSeries(data)
+  const rawGlobalMissions = sortedMissionSeries(data).filter((m) => isMissionCurrentForParents(m, today))
   const globalMissionsBySeriesId = new Map(rawGlobalMissions.map((m) => [m.seriesId, m]))
   const globalMissions = pendingGlobalOrder
     ? pendingGlobalOrder.map((id) => globalMissionsBySeriesId.get(id)).filter((m): m is Mission => !!m)
@@ -220,6 +223,14 @@ export default function App() {
       // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
       // editar, eso borraría la única copia existente sin crear una de repuesto.
       if (!draft.oneOffDate) return
+      // Y una fecha ya pasada crearía una misión que nace invisible (MOO2-167): el panel ya no
+      // lista las puntuales pasadas, así que un año mal tecleado dejaría una misión que no se
+      // puede ni corregir ni borrar desde ninguna pantalla. El `min` de los dos selectores guía
+      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea.
+      if (draft.oneOffDate < todayISODate()) {
+        showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
+        return
+      }
       const dayIdx = weekdayOfISODate(draft.oneOffDate)
       if (editingId === 'new') {
         await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })

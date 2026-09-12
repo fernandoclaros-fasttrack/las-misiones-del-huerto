@@ -33,6 +33,9 @@ for the original design spec (tokens, business rules, data model).
   from the diff.
 - Before building a genuinely new feature, check Linear for existing/related tickets first
   (duplicate detection) rather than assuming a clean slate.
+- See `.claude/moon-develop-state.md` for moon-develop's cached run state (team/project IDs, the
+  real column names, and the backlog analysis behind what to pick next). The tracker always wins
+  over that file.
 
 ## Merging
 
@@ -103,7 +106,8 @@ without a matching risk reduction.
   every *current* child's ID (not `[]`) each time the doc is read, so pre-MOO-27 "visible to
   everyone" missions keep including children added later, until the mission is next saved with an
   explicit selection. `isMissionVisibleTo()` in `src/shared/logic.ts` is what the kids screen
-  filters by; there's no visibility gate on the parents screen, which always shows every mission.
+  filters by; the parents screen never filters by assignment and shows every mission whoever it
+  is for (its only gate is the one-off date rule below, MOO2-167).
 - **Resetear** (parents' reset button) zeroes `acumulado`, zeroes every child's points, AND sets
   every mission across every day back to `pendiente`. It does NOT touch `redemptions`,
   `adjustments` or `changeLog` — those are logs of past events, not current state. It *does*
@@ -146,8 +150,17 @@ without a matching risk reduction.
   its date's weekday (reuses `activeDays`/`editMission`'s existing per-day-copy machinery
   unchanged — it's just always a single-element array for a one-off), but `isMissionActiveToday()`
   in `logic.ts` is what actually hides it from the kids screen except on the exact date, so it
-  doesn't come back every time that weekday recurs. Parents always see it regardless of date (no
-  visibility gate there, same as always), badged with its date instead of the weekday dots.
+  doesn't come back every time that weekday recurs. Parents see it while its date is today or in
+  the future, badged with its date instead of the weekday dots — **two different rules for the
+  same field, on purpose** (MOO2-167): the kid only wants today's list, but the parent still has
+  to be able to edit or delete the one they scheduled for next Saturday. `isMissionCurrentForParents()`
+  is the parents' half, applied in `padres/App.tsx` to both the day tab and the "Todo" view.
+  A past one-off is only *hidden*, never deleted: it stays in its `Day` so the points history and
+  its recorded `participants` stay intact, which also means those missions accumulate in the
+  document with no way to purge them from the UI. **That is also why a one-off can no longer be
+  saved with a date in the past**: it would be born invisible to both screens, unfixable and
+  undeletable. Both date inputs carry `min={todayISODate()}` and `saveMission` re-checks it,
+  because a native date input still accepts a typed value below its `min`.
   Switching a mission between one-off and recurring (MOO2-61) is *not* special-cased in
   `editMission` — it's just an edit to `activeDays` down to one day, same as any other day-selection
   change; only the `oneOffDate` field itself needs explicit handling. Firestore rejects `undefined`
