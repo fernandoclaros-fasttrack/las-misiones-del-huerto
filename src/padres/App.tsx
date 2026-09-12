@@ -114,13 +114,25 @@ export default function App() {
     }
   }, [])
 
-  /** Y si el día cambia con un formulario abierto, la fecha que el formulario traía puesta sola
-   *  (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al guardar saltaría
-   *  un "esa fecha ya ha pasado" sobre algo que el usuario no tecleó. Se adelanta al nuevo hoy.
-   *  Solo puede alcanzar a una fecha ya pasada: el formulario no deja elegir ninguna. */
+  /** Y si el día cambia con el formulario de alta abierto, la fecha que ese formulario traía
+   *  puesta sola (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al
+   *  guardar saltaría un "esa fecha ya ha pasado" sobre algo que el usuario no tecleó. Se
+   *  adelanta al nuevo día, y con dos condiciones que no son de adorno:
+   *
+   *  - **Solo al alta.** Sobre la ficha de una misión que ya existe, esto reescribiría su fecha
+   *    real: al guardar, la misión se mudaría de día de la semana sola, y si estaba completada
+   *    `editMission` borra la copia del día viejo y **descuenta los puntos ya dados a los niños**.
+   *    Dejarse una ficha abierta por la noche no puede despagar una tarea hecha.
+   *  - **Solo si la fecha sigue siendo la que puso el formulario** (el "hoy" de antes), no
+   *    cualquier fecha pasada: una que el usuario haya tecleado mal se queda como está, para que
+   *    el aviso hable de lo que él escribió y no de lo que le hemos cambiado por detrás. */
+  const ayerRef = useRef(today)
   useEffect(() => {
-    setDraft((d) => (d.oneOffDate && d.oneOffDate < today ? { ...d, oneOffDate: today } : d))
-  }, [today])
+    const previo = ayerRef.current
+    ayerRef.current = today
+    if (previo === today) return
+    setDraft((d) => (editingId === 'new' && d.oneOffDate === previo ? { ...d, oneOffDate: today } : d))
+  }, [today, editingId])
 
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
