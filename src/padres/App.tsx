@@ -96,6 +96,54 @@ export default function App() {
    *  guarda `seriesId`, no `id` de misión. */
   const [pendingGlobalOrder, setPendingGlobalOrder] = useState<string[] | null>(null)
 
+  /** Qué día es hoy, para el filtro de las misiones puntuales (MOO2-167). No puede calcularse
+   *  en cada render y quedarse ahí: esta app vive en la tablet de la cocina, así que el panel
+   *  cruza la medianoche abierto y sin repintarse. Con la fecha congelada, la lista seguiría
+   *  enseñando una puntual de ayer y `saveMission`, que sí mira el día real, la rechazaría con
+   *  un "esa fecha ya ha pasado" sobre una tarjeta que se ve perfectamente al día. Las dos
+   *  mitades leen de aquí, así que no pueden discrepar. Se refresca al volver a la pestaña y
+   *  con una comprobación por minuto, y solo repinta el día que el valor cambia de verdad. */
+  const [today, setToday] = useState(todayISODate)
+  useEffect(() => {
+    const sync = () => setToday((prev) => (todayISODate() === prev ? prev : todayISODate()))
+    const timer = window.setInterval(sync, 60_000)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', sync)
+    }
+  }, [])
+
+  /** Y si el día cambia con el formulario de alta abierto, la fecha que ese formulario traía
+   *  puesta sola (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al
+   *  guardar saltaría un "esa fecha ya ha pasado" sobre algo que el usuario no tecleó. Se
+   *  adelanta al nuevo día. Lo que decide no es si es un alta, sino **de quién es esa fecha**:
+   *
+   *  - Si es la que puso el formulario (el "hoy" de antes), se adelanta. Pasa en el alta y
+   *    también al convertir una misión recurrente en puntual, que rellena la fecha igual.
+   *  - Si es la fecha que la misión ya tenía guardada, no se toca jamás. Reescribirla haría que
+   *    al guardar la misión se mudara sola de día de la semana, y si estaba completada
+   *    `editMission` borra la copia del día viejo y **descuenta los puntos ya dados a los
+   *    niños**. Dejarse una ficha abierta por la noche no puede despagar una tarea hecha.
+   *  - Y sobre una misión **ya completada** no se adelanta nada, venga la fecha de donde venga:
+   *    ahí el adelanto es justo lo que la mudaría de día. Se prefiere el aviso de `saveMission`
+   *    y que la fecha nueva la elija una persona.
+   *
+   *  Una fecha pasada tecleada a mano no la alcanza esto, salvo que sea exactamente el día de
+   *  ayer, que es indistinguible de la que puso el formulario; cualquier otra sigue su camino
+   *  hasta el aviso de `saveMission`. */
+  const ayerRef = useRef(today)
+  useEffect(() => {
+    const previo = ayerRef.current
+    ayerRef.current = today
+    if (previo === today) return
+    const suya = editingId && editingId !== 'new'
+      ? data?.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)
+      : undefined
+    const intocable = suya?.oneOffDate === previo || suya?.status === 'completada'
+    setDraft((d) => (d.oneOffDate === previo && !intocable ? { ...d, oneOffDate: today } : d))
+  }, [today, editingId, data])
+
   const [toast, setToast] = useState<string | null>(null)
   const toastTimerRef = useRef<number | null>(null)
   useEffect(() => () => {
@@ -132,8 +180,12 @@ export default function App() {
   const day = data.days[selected]
   // Las one-off pasadas dejan de listarse aquí (MOO2-167): siguen guardadas en su `Day`, pero ya
   // no son accionables y mezcladas con las recurrentes impedían ver de un vistazo qué se repite.
-  const today = todayISODate()
-  const rawMissions = (day ? sortedMissions(day) : []).filter((m) => isMissionCurrentForParents(m, today))
+  // Excepción: la tarjeta que se está editando no se filtra nunca. Si la puntual abierta dejara
+  // de pasar el filtro al cambiar el día, el formulario se desmontaría con lo tecleado dentro y
+  // sin decir nada. Salva la edición en curso y deja reprogramar la misión a una fecha futura;
+  // al cerrar el formulario vuelve a esconderse, como cualquier otra puntual pasada.
+  const seListaEnPadres = (m: Mission) => isMissionCurrentForParents(m, today) || m.id === editingId
+  const rawMissions = (day ? sortedMissions(day) : []).filter(seListaEnPadres)
   const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
   const missions =
     pendingOrder && pendingOrder.dayIdx === selected
@@ -141,7 +193,7 @@ export default function App() {
       : rawMissions
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
-  const rawGlobalMissions = sortedMissionSeries(data).filter((m) => isMissionCurrentForParents(m, today))
+  const rawGlobalMissions = sortedMissionSeries(data).filter(seListaEnPadres)
   const globalMissionsBySeriesId = new Map(rawGlobalMissions.map((m) => [m.seriesId, m]))
   const globalMissions = pendingGlobalOrder
     ? pendingGlobalOrder.map((id) => globalMissionsBySeriesId.get(id)).filter((m): m is Mission => !!m)
@@ -223,19 +275,41 @@ export default function App() {
       // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
       // editar, eso borraría la única copia existente sin crear una de repuesto.
       if (!draft.oneOffDate) return
-      // Y una fecha ya pasada crearía una misión que nace invisible (MOO2-167): el panel ya no
-      // lista las puntuales pasadas, así que un año mal tecleado dejaría una misión que no se
-      // puede ni corregir ni borrar desde ninguna pantalla. El `min` de los dos selectores guía
-      // el gesto; esto cierra lo que se teclea a mano, que el `min` no bloquea.
-      if (draft.oneOffDate < todayISODate()) {
+      // Se mide contra el día real y no contra el `today` pintado: el panel puede llevar abierto
+      // desde ayer y el minuto del reloj que lo refresca puede no haber saltado todavía. De paso
+      // pone la lista al día, para que nada de lo que salga a continuación contradiga lo que se
+      // ve. Lo que sigue son las dos mitades de la misma regla, alta y edición.
+      const realToday = todayISODate()
+      if (realToday !== today) setToday(realToday)
+      // La fecha que la misión ya tenía guardada, si se está editando una. Es lo que distingue
+      // "esta fecha la eligió el usuario o la puso la misión" de "la rellenó el formulario".
+      const misionEditada = editingId && editingId !== 'new'
+        ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)
+        : undefined
+      const suFechaDeAntes = misionEditada?.oneOffDate
+      // Una fecha puesta por el formulario que se ha quedado en ayer se adelanta también aquí,
+      // no solo en el refresco por minuto: entre la medianoche y el minuto siguiente hay un
+      // hueco, y guardar dentro de él devolvía un aviso sobre una fecha que nadie eligió.
+      // Nunca sobre una misión ya completada: adelantarla la mudaría de día de la semana, y a
+      // una completada eso le borra la copia y **le quita a los niños los puntos ya dados**.
+      // Ahí es mejor el aviso, y que la fecha nueva la elija una persona.
+      const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes && misionEditada?.status !== 'completada'
+        ? realToday
+        : draft.oneOffDate
+      // Y la fecha de una misión que ya existe se deja volver a guardar tal cual aunque ya haya
+      // pasado: rechazarla obligaría a reprogramarla solo para corregirle el título, con el
+      // descuento de puntos que eso arrastra. Lo que sí se rechaza es una fecha pasada elegida a
+      // mano, que dejaría una misión que no se puede ni ver ni corregir. El `min` de los dos
+      // selectores guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea.
+      if (fecha < realToday && fecha !== suFechaDeAntes) {
         showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
         return
       }
-      const dayIdx = weekdayOfISODate(draft.oneOffDate)
+      const dayIdx = weekdayOfISODate(fecha)
       if (editingId === 'new') {
-        await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+        await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
       } else if (editingId) {
-        await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: draft.oneOffDate })
+        await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
       }
       setEditingId(null)
       return
