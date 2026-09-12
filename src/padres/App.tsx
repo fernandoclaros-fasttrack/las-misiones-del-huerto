@@ -150,7 +150,11 @@ export default function App() {
   const day = data.days[selected]
   // Las one-off pasadas dejan de listarse aquí (MOO2-167): siguen guardadas en su `Day`, pero ya
   // no son accionables y mezcladas con las recurrentes impedían ver de un vistazo qué se repite.
-  const rawMissions = (day ? sortedMissions(day) : []).filter((m) => isMissionCurrentForParents(m, today))
+  // Excepción: la tarjeta que se está editando no se filtra nunca. Si la puntual abierta dejara
+  // de pasar el filtro al cambiar el día, el formulario se desmontaría con lo tecleado dentro y
+  // esa misión ya no se podría reprogramar ni borrar desde ninguna pantalla.
+  const seListaEnPadres = (m: Mission) => isMissionCurrentForParents(m, today) || m.id === editingId
+  const rawMissions = (day ? sortedMissions(day) : []).filter(seListaEnPadres)
   const missionsById = new Map(rawMissions.map((m) => [m.id, m]))
   const missions =
     pendingOrder && pendingOrder.dayIdx === selected
@@ -158,7 +162,7 @@ export default function App() {
       : rawMissions
   const hasCustomOrder = (day?.missionOrder.length ?? 0) > 0
 
-  const rawGlobalMissions = sortedMissionSeries(data).filter((m) => isMissionCurrentForParents(m, today))
+  const rawGlobalMissions = sortedMissionSeries(data).filter(seListaEnPadres)
   const globalMissionsBySeriesId = new Map(rawGlobalMissions.map((m) => [m.seriesId, m]))
   const globalMissions = pendingGlobalOrder
     ? pendingGlobalOrder.map((id) => globalMissionsBySeriesId.get(id)).filter((m): m is Mission => !!m)
