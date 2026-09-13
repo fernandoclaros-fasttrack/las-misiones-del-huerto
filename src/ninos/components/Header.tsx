@@ -152,7 +152,7 @@ export function Header({ accent, points, pointsKey, showFloat, floatKey, floatTe
                 cursor: 'pointer',
               }}
             >
-              🧾 Mis puntos
+              🧾 Historial
             </button>
           )}
         </div>
