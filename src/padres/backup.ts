@@ -69,6 +69,13 @@ export function parseBackup(text: string): ParsedBackup {
   if (!data.days.every((day) => isRecord(day) && Array.isArray(day.missions))) {
     return { ok: false, error: 'La copia está dañada: algún día no tiene su lista de misiones.' }
   }
+  // Ausentes se rellenan solas (una copia vieja no las trae), pero presentes y con otra forma no:
+  // `normalize()` solo mira null/undefined, así que un `children` que no sea lista llegaría entera
+  // hasta el cálculo de puntos y reventaría a mitad de restauración, con un error genérico en vez
+  // del motivo. Aquí se rechaza antes de tocar nada.
+  const collections = ['children', 'concepts', 'redemptions', 'adjustments', 'changeLog', 'missionTemplates', 'globalMissionOrder'] as const
+  const broken = collections.find((key) => data[key] !== undefined && !Array.isArray(data[key]))
+  if (broken) return { ok: false, error: `La copia está dañada: "${broken}" no tiene el formato esperado.` }
   const exportedAt = typeof payload.exportedAt === 'string' ? payload.exportedAt : undefined
   return { ok: true, backup: { exportedAt, data: data as unknown as FamilyData } }
 }

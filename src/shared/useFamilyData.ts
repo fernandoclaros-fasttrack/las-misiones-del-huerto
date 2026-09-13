@@ -52,6 +52,11 @@ function normalize(raw: FamilyData): FamilyData {
   const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
   return {
     ...raw,
+    // Único campo del documento que no se rellenaba aquí, porque nada lo lee y siempre ha
+    // existido. Dejarlo pasar a `undefined` sí importa desde MOO2-100: la restauración escribe
+    // el documento campo a campo y Firestore rechaza `undefined`, así que una copia sin
+    // `basePoints` tumbaba la restauración entera con un error genérico.
+    basePoints: raw.basePoints ?? 0,
     days,
     children,
     concepts: raw.concepts ?? [],
