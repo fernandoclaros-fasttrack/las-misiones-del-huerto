@@ -35,16 +35,37 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
 - No hay framework de tests en el repo: las comprobaciones son `npm run build` (tsc + vite),
   `npm run lint` (oxlint) y el recorrido por navegador.
 
-**Análisis del backlog (2026-09-12)**
+**Análisis del backlog (actualizado 2026-09-13)**
 - Orden natural de la tanda de copias de seguridad: **MOO2-100 → MOO2-103 → MOO2-104**. El 100
   (restaurar desde fichero) es el mecanismo que el 104 (restaurar una copia de la nube por fecha)
   reutiliza; hacerlos al revés es escribir dos veces la parte delicada.
-- **MOO2-100 es el de más impacto del tablero** (High): el 7/8/2026 la app se comió los datos de
-  la familia (MOO2-99) y sigue sin haber forma de restaurar. Tiene dos preguntas abiertas sin
-  responder (si la restauración reemplaza el documento entero o solo una parte, y qué pasa con el
-  `changeLog`) que hay que cerrar antes de implementarlo.
+- **MOO2-100 hecho el 2026-09-13** (PR #28). Sus dos preguntas abiertas las cerró Fernando:
+  restaurar reemplaza el **documento entero**, y el `changeLog` se **fusiona por id** con el de la
+  copia. Eso deja a **MOO2-103 → MOO2-104** como la continuación natural de la tanda de copias de
+  seguridad: el mecanismo de restaurar desde un fichero ya existe y el 104 lo reutiliza.
+- Aviso para el 103/104: la restauración vive en `restoreBackup` (`useFamilyData.ts`) y la
+  validación en `parseBackup` (`padres/backup.ts`); ambas son reutilizables tal cual desde una
+  copia traída de la nube — lo único específico del fichero local es el `<input type=file>` de
+  `RestoreBackupView`.
 - **MOO2-101 cerrado como duplicado** de MOO2-103 + MOO2-104 (autorizado por Fernando el
   2026-09-12): pedía lo mismo repartido peor.
 - **MOO2-168** (reutilizar una puntual desde la lista rápida) es el hermano de MOO2-167 y queda
   en Backlog. Toca el formulario de creación y `createMissionsFromTemplates`, que hoy crea
   siempre misiones recurrentes en el día que se está viendo.
+- **MOO2-169** (que las dos pantallas se enteren del cambio de día) queda en Backlog con "Needs
+  Refinement" y **tres preguntas abiertas de producto** sin responder, la de más peso si un niño/a
+  puede seguir marcando una puntual de ayer. Es continuación de MOO2-167, que ya dejó `today` como
+  estado en el panel de padres; falta `selected` en las dos pantallas y el `todayISODate()` que
+  `ninos/App.tsx` calcula en cada render.
+
+**Verificación contra producción: lo que cuesta redescubrir**
+- El `.env.local` **no está en los worktrees**, solo en el checkout principal: hay que copiarlo
+  (`cp ../../../.env.local .env.local`) o sale la pantalla de login.
+- El navegador del panel **no escribe las descargas a disco**, así que para inspeccionar una copia
+  hay que interceptar `URL.createObjectURL` en la página. Sacar el JSON fuera del navegador está
+  bloqueado por el clasificador; se trabaja con él dentro de la pestaña.
+- Comparar dos documentos con `JSON.stringify` da **falso negativo**: Firestore no conserva el
+  orden de las claves. Hace falta una comparación profunda que lo ignore.
+- Para probar cosas destructivas sin arriesgar los datos de la familia, levantar una segunda
+  instancia sin Firebase (`VITE_FIREBASE_API_KEY= VITE_FIREBASE_PROJECT_ID= npx vite --port 5199`),
+  que cae al fallback de localStorage.
