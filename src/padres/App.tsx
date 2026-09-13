@@ -13,6 +13,7 @@ import { NewMissionForm } from './components/NewMissionForm'
 import { MissionTemplatesQuickPick } from './components/MissionTemplatesQuickPick'
 import { SettingsMenu } from './components/SettingsMenu'
 import { ChangeHistoryView } from './components/ChangeHistoryView'
+import { RestoreBackupView } from './components/RestoreBackupView'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
 import { sortedMissions, sortedMissionSeries, byTitle, isMissionCurrentForParents } from '../shared/logic'
@@ -64,10 +65,15 @@ export default function App() {
     createMissionsFromTemplates,
     editMissionTemplate,
     deleteMissionTemplate,
+    restoreBackup,
   } = useFamilyData('padre', isAuthed)
 
   const [selected, setSelected] = useState(todayIndex())
   const [showHistory, setShowHistory] = useState(false)
+  /** Pantalla de restaurar copia (MOO2-100), al mismo nivel que el historial: sustituye el área
+   *  de misiones en vez de abrirse encima, porque es un flujo de varios pasos (elegir fichero,
+   *  revisarlo, confirmar) y no una confirmación de una línea como la del reseteo. */
+  const [showRestore, setShowRestore] = useState(false)
   /** Vista global de misiones (MOO-30): activada desde la pestaña extra "Todo" en `DayTabs`,
    *  junto a los días de la semana. Alterna el área de misiones entre la vista por día (con
    *  edición, arrastre, etc.) y una vista de solo lectura con todas las series de misión
@@ -426,13 +432,24 @@ export default function App() {
           </div>
           <SettingsMenu
             onBackup={() => downloadBackup(data)}
+            onRestore={() => setShowRestore(true)}
             onHistory={() => setShowHistory(true)}
             onReset={() => void resetCounter()}
             onLogout={() => void logout()}
           />
         </header>
 
-        {showHistory ? (
+        {showRestore ? (
+          <RestoreBackupView
+            current={data}
+            onRestore={restoreBackup}
+            onDone={(message) => {
+              setShowRestore(false)
+              showToast(message)
+            }}
+            onBack={() => setShowRestore(false)}
+          />
+        ) : showHistory ? (
           <ChangeHistoryView entries={data.changeLog} kids={data.children} onBack={() => setShowHistory(false)} />
         ) : (
           <>

@@ -3,6 +3,7 @@ import { BTN_CANCEL, BTN_DANGER } from '../styles'
 
 interface Props {
   onBackup: () => void
+  onRestore: () => void
   onHistory: () => void
   onReset: () => void
   onLogout: () => void
@@ -24,7 +25,7 @@ const ITEM_STYLE = {
   textAlign: 'left' as const,
 }
 
-export function SettingsMenu({ onBackup, onHistory, onReset, onLogout }: Props) {
+export function SettingsMenu({ onBackup, onRestore, onHistory, onReset, onLogout }: Props) {
   const [open, setOpen] = useState(false)
   const [confirmingReset, setConfirmingReset] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -84,6 +85,18 @@ export function SettingsMenu({ onBackup, onHistory, onReset, onLogout }: Props) 
             style={ITEM_STYLE}
           >
             📥 Copia de seguridad
+          </button>
+
+          {/* Justo debajo de la descarga: son las dos mitades de lo mismo (MOO2-100), y la
+              restauración solo tiene sentido para quien sabe que existe la copia. */}
+          <button
+            onClick={() => {
+              onRestore()
+              setOpen(false)
+            }}
+            style={ITEM_STYLE}
+          >
+            ♻️ Restaurar copia
           </button>
 
           <button
