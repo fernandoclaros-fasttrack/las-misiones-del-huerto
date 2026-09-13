@@ -75,6 +75,11 @@ function totalPoints(d: Pick<FamilyData, 'acumulado' | 'children'>): number {
   return d.acumulado + d.children.reduce((sum, c) => sum + c.points, 0)
 }
 
+/** Enlace de una entrada del historial con la misión que la provocó y, al descompletarla, con la
+ *  entrada que revierte (MOO2-171). Se pasa a `withHistory` como un `Partial` ya construido, con
+ *  las claves ausentes en vez de a `undefined`, porque Firestore rechaza `undefined`. */
+type MissionLink = Pick<ChangeLogEntry, 'missionId' | 'reverses'>
+
 /** Envuelve un `Mutator` para registrar una entrada de `changeLog` (MOO-39) cuando, y solo
  *  cuando, la acción cambia el total de puntos en juego — así `logic.ts` no necesita saber
  *  nada de historial (se queda puro) y no hay que decidir caso a caso en cada acción si
@@ -87,6 +92,7 @@ function withHistory<TResult>(
   mutator: Mutator<TResult>,
   describe: (data: FamilyData, result: TResult) => string | null,
   reasonFor?: (data: FamilyData, result: TResult) => string | undefined,
+  linkFor?: (data: FamilyData, result: TResult) => MissionLink,
 ): Mutator<TResult> {
   return (data) => {
     const { patch, result } = mutator(data)
@@ -103,6 +109,9 @@ function withHistory<TResult>(
       description,
       deltas: childDeltas(data.children, after.children),
       ...(reason ? { reason } : {}),
+      // Firestore rechaza `undefined`, así que las claves opcionales se omiten en vez de ponerse
+      // a `undefined` (mismo motivo por el que `oneOffDate` se limpia desestructurando).
+      ...(linkFor?.(data, result) ?? {}),
       timestamp: id,
     }
     return { patch: { ...patch, changeLog: [...data.changeLog, entry] }, result }
@@ -243,6 +252,16 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
               return mission.status === 'completada' ? `Descompletó la misión "${mission.title}"` : `Completó la misión "${mission.title}"`
             },
             (d) => d.days[dayIdx]?.missions.find((mi) => mi.id === missionId)?.title,
+            // Deja el rastro que empareja completar con descompletar (MOO2-171). Al completar
+            // basta con apuntar la misión; al descompletar se enlaza además con la entrada que
+            // se está revirtiendo, para que el historial del niño/a esconda las dos.
+            (d) => {
+              const mission = d.days[dayIdx]?.missions.find((mi) => mi.id === missionId)
+              if (!mission) return {}
+              if (mission.status !== 'completada') return { missionId }
+              const completion = logic.lastUnreversedCompletion(d.changeLog, missionId)
+              return completion ? { missionId, reverses: completion.id } : { missionId }
+            },
           ),
         ),
 
