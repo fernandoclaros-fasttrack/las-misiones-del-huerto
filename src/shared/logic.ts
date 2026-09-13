@@ -618,9 +618,16 @@ export interface LedgerRow {
  *  que no cuadra con el número que el niño/a ve en su pantalla.
  *
  *  Las entradas sin motivo propio caen en `description`, que es texto de la pantalla de padres
- *  pero sigue explicando qué pasó. */
+ *  pero sigue explicando qué pasó.
+ *
+ *  Una misión completada y luego descompletada no aparece (MOO2-171): sus dos entradas se anulan
+ *  entre sí, así que para el niño/a no pasó nada. Esconder las dos no descuadra el saldo de las
+ *  filas más antiguas porque el par suma cero; las que quedan entre medias muestran el saldo sin
+ *  contar la misión, que es justo la historia coherente con no enseñarla. */
 export function childLedger(changeLog: ChangeLogEntry[], childId: string, currentPoints: number): LedgerRow[] {
+  const cancelled = cancelledOutEntryIds(changeLog, childId)
   const mine = changeLog
+    .filter((entry) => !cancelled.has(entry.id))
     .map((entry) => ({ entry, delta: entry.deltas.find((d) => d.childId === childId) }))
     .filter((x): x is { entry: ChangeLogEntry; delta: ChildPointsDelta } => x.delta !== undefined)
     .sort((a, b) => b.entry.timestamp - a.entry.timestamp)
@@ -637,6 +644,45 @@ export function childLedger(changeLog: ChangeLogEntry[], childId: string, curren
     balance -= delta.points
     return row
   })
+}
+
+/** Las dos entradas de cada par completar/descompletar que, *para este hijo/a*, se anulan entre sí
+ *  (MOO2-171): la descompletación, que lleva el enlace, y la completación a la que apunta. Solo el
+ *  historial del niño/a las esconde; el de padres es la auditoría y las sigue mostrando.
+ *
+ *  Se comprueba que los dos movimientos sumen cero en vez de fiarse solo del enlace, porque no
+ *  siempre lo hacen: si entre completar y descompletar se editan los puntos de la misión, la
+ *  devolución es mayor o menor que el cargo y hay una tercera entrada por la diferencia. Esconder
+ *  ese par dejaría el saldo de las filas anteriores descuadrado, así que en ese caso se enseña
+ *  todo, que es como se comportaba antes de este ticket.
+ *
+ *  Los pares anteriores a MOO2-171 no tienen `reverses` y no se puede reconstruir cuál emparejaba
+ *  con cuál, así que siguen visibles. Adivinarlo por "la anterior de la misma misión" fallaría
+ *  justo en el caso que motiva el ticket: una misión completada y descompletada varias veces. */
+function cancelledOutEntryIds(changeLog: ChangeLogEntry[], childId: string): Set<string> {
+  const byId = new Map(changeLog.map((e) => [e.id, e]))
+  const pointsFor = (entry: ChangeLogEntry) => entry.deltas.find((d) => d.childId === childId)?.points ?? 0
+  const ids = new Set<string>()
+  for (const entry of changeLog) {
+    if (!entry.reverses) continue
+    const reversed = byId.get(entry.reverses)
+    if (!reversed || pointsFor(entry) + pointsFor(reversed) !== 0) continue
+    ids.add(entry.id)
+    ids.add(reversed.id)
+  }
+  return ids
+}
+
+/** La completación de una misión que todavía no ha sido revertida (MOO2-171), para que
+ *  descompletarla sepa a qué entrada apuntar. Se busca por `missionId` y no por el título, que el
+ *  padre/madre puede haber editado entre una cosa y la otra. Devuelve `undefined` para misiones
+ *  completadas antes de MOO2-171, que no dejaron `missionId`: ese par se queda visible, tal y como
+ *  se decidió en el ticket. */
+export function lastUnreversedCompletion(changeLog: ChangeLogEntry[], missionId: string): ChangeLogEntry | undefined {
+  const alreadyReversed = new Set(changeLog.map((e) => e.reverses).filter((id): id is string => !!id))
+  return changeLog
+    .filter((e) => e.missionId === missionId && !e.reverses && !alreadyReversed.has(e.id))
+    .reduce<ChangeLogEntry | undefined>((newest, e) => (!newest || e.timestamp > newest.timestamp ? e : newest), undefined)
 }
 
 /** Lunes 00:00 de la semana a la que pertenece un instante. La semana empieza en lunes para que

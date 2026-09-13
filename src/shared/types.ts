@@ -135,6 +135,16 @@ export interface ChangeLogEntry {
    *  niño/a en tercera persona y repite los puntos, que ya se muestran aparte. Ausente en
    *  entradas antiguas y en acciones sin un motivo mejor que la propia descripción. */
   reason?: string
+  /** Misión que movió los puntos, cuando la acción fue completarla o descompletarla (MOO2-171).
+   *  Ausente en el resto de acciones y en las entradas guardadas antes de MOO2-171. Sirve para
+   *  emparejar una descompletación con la completación que revierte sin depender del título, que
+   *  el padre/madre puede haber editado por el camino. */
+  missionId?: string
+  /** ID de la entrada que esta revierte (MOO2-171): lo rellena descompletar una misión, apuntando
+   *  a la completación correspondiente. El historial del niño/a esconde las dos, porque juntas no
+   *  movieron sus puntos. El historial de padres las sigue mostrando: que una misión se marcara y
+   *  se desmarcara es información útil para ellos aunque sea ruido para el niño/a. */
+  reverses?: string
   /** epoch ms */
   timestamp: number
 }
