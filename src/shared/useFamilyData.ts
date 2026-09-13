@@ -470,7 +470,8 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
           withHistory(
             actor,
             (d) => {
-              const r = logic.redeemChildPoints(d, childId, points, concept, nextId())
+              // Solo el panel de padres puede dejar el saldo en negativo (MOO2-172).
+              const r = logic.redeemChildPoints(d, childId, points, concept, nextId(), actor === 'padre')
               return { patch: r.ok ? { children: r.children, redemptions: r.redemptions } : null, result: r }
             },
             (d) => {

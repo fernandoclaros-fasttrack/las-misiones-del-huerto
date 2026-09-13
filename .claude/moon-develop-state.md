@@ -35,7 +35,16 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
 - No hay framework de tests en el repo: las comprobaciones son `npm run build` (tsc + vite),
   `npm run lint` (oxlint) y el recorrido por navegador.
 
-**Análisis del backlog (actualizado 2026-09-13)**
+**Análisis del backlog (actualizado 2026-09-13, tras MOO2-172)**
+- **MOO2-172 hecho el 2026-09-13**. No tenía preguntas abiertas y resultó ser de una línea: el
+  único obstáculo era el guard de saldo en `redeemChildPoints`. Aprendizaje reutilizable: **antes
+  de implementar un ticket de "permitir X", comprueba cuántos AC ya se cumplen** — aquí 5 de 8 ya
+  eran ciertos (nada en la app recorta puntos a cero) y el trabajo real fue verificarlos, no
+  escribirlos.
+- Queda en Backlog, sin nadie empezado: **MOO2-103 → MOO2-104** (copias en la nube),
+  **MOO2-168** (puntual desde la lista rápida) y **MOO2-169** (cambio de día). Todos Medium, así
+  que la prioridad no desempata; 103 es con diferencia el más grande y 169 sigue bloqueado por
+  producto.
 - Orden natural de la tanda de copias de seguridad: **MOO2-100 → MOO2-103 → MOO2-104**. El 100
   (restaurar desde fichero) es el mecanismo que el 104 (restaurar una copia de la nube por fecha)
   reutiliza; hacerlos al revés es escribir dos veces la parte delicada.
@@ -66,6 +75,15 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
   bloqueado por el clasificador; se trabaja con él dentro de la pestaña.
 - Comparar dos documentos con `JSON.stringify` da **falso negativo**: Firestore no conserva el
   orden de las claves. Hace falta una comparación profunda que lo ignore.
+- **`node_modules` no existe en los worktrees**: npm resuelve hacia arriba, al checkout principal
+  (`D:/Git/las-misiones-del-huerto/node_modules`). `npm run build` funciona, pero un script suelto
+  con `import 'esbuild'` falla; invoca los binarios por ruta absoluta desde ahí.
+- **Para probar lógica pura sin framework de tests**, transpila y ejecuta con node:
+  `node_modules/.bin/tsc --ignoreConfig src/shared/logic.ts src/shared/types.ts --outDir <tmp>
+  --module esnext --target es2022 --moduleResolution bundler --skipLibCheck`. El `--ignoreConfig`
+  es obligatorio: sin él tsc aborta porque hay `tsconfig.json` y se le pasan ficheros sueltos.
+  Sirve para cubrir los casos que la UI no deja alcanzar (p. ej. un guard que el propio formulario
+  ya bloquea antes).
 - Para probar cosas destructivas sin arriesgar los datos de la familia, levantar una segunda
   instancia sin Firebase (`VITE_FIREBASE_API_KEY= VITE_FIREBASE_PROJECT_ID= npx vite --port 5199`),
   que cae al fallback de localStorage.
