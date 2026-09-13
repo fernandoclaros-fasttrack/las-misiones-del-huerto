@@ -7,7 +7,7 @@ for the original design spec (tokens, business rules, data model).
 
 ## Linear workflow
 
-- Team **Moon Personal**, ticket prefix **MOO2**, project "Las misiones del huerto". There is
+- Team **Moon 2**, ticket prefix **MOO2**, project "Las misiones del huerto". There is
   *also* a separate team called "Moon" with prefix MOO — don't confuse them; querying statuses
   against "Moon" returns IDs that won't apply to these tickets.
 - **Ticket numbers were renumbered when the project moved to MOO2, and the comments were not.**
