@@ -241,6 +241,60 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
 
   const actions = useMemo(
     () => ({
+      /** Restaura una copia de seguridad encima del documento actual (MOO2-100).
+       *
+       *  Sustituye el documento **entero**: el AC pide que restaurar reproduzca exactamente el
+       *  estado que la copia tenía al descargarse, y una restauración parcial dejaría cosas como
+       *  canjes apuntando a hijos que ya no existen. Por eso el patch se escribe campo a campo y
+       *  tipado como `FamilyData` en vez de esparcir `restored`: si mañana se añade un campo
+       *  nuevo al documento, esto deja de compilar hasta que alguien decida qué hace la
+       *  restauración con él, en vez de restaurar a medias en silencio.
+       *
+       *  No pasa por `withHistory` porque ese solo registra cuando cambia el total de puntos, y
+       *  una restauración tiene que quedar registrada siempre — puede reponer misiones, hijos o
+       *  plantillas sin mover un solo punto, y aun así no es un cambio invisible.
+       *
+       *  El `changeLog` se **fusiona** por id (decisión de producto, pregunta abierta del
+       *  ticket): es un registro de auditoría y perderlo tiene coste por los dos lados. Quedarse
+       *  solo con el actual borraría la historia justo en el caso para el que existe el ticket
+       *  (si el documento se resembró, el historial vivo está vacío); quedarse solo con el de la
+       *  copia borraría todo lo ocurrido desde que se descargó. La aritmética del historial del
+       *  niño/a sigue cuadrando porque va hacia atrás desde los puntos actuales y la entrada de
+       *  la restauración aporta exactamente el salto que da. */
+      restoreBackup: (backup: FamilyData, exportedAt?: string) =>
+        run((d) => {
+          const restored = normalize(backup)
+          // Las entradas compartidas son la misma en los dos lados; ante un id repetido gana la
+          // del documento vivo, que ya viene normalizada por `run`.
+          const byId = new Map(restored.changeLog.map((e) => [e.id, e]))
+          for (const entry of d.changeLog) byId.set(entry.id, entry)
+          const merged = [...byId.values()].sort((a, b) => a.timestamp - b.timestamp)
+          const id = nextId()
+          const copyDate = exportedAt ? new Date(exportedAt) : null
+          const label = copyDate && !Number.isNaN(copyDate.getTime()) ? ` del ${copyDate.toLocaleDateString('es-ES')}` : ''
+          const entry: ChangeLogEntry = {
+            id: `chg${id}`,
+            actor,
+            description: `Restauró una copia de seguridad${label}`,
+            deltas: childDeltas(d.children, restored.children),
+            reason: 'Copia de seguridad restaurada',
+            timestamp: id,
+          }
+          const patch: FamilyData = {
+            basePoints: restored.basePoints,
+            acumulado: restored.acumulado,
+            concepts: restored.concepts,
+            days: restored.days,
+            children: restored.children,
+            redemptions: restored.redemptions,
+            adjustments: restored.adjustments,
+            globalMissionOrder: restored.globalMissionOrder,
+            missionTemplates: restored.missionTemplates,
+            changeLog: [...merged, entry],
+          }
+          return { patch, result: undefined }
+        }),
+
       setMissionStatus: (dayIdx: number, missionId: string, status: MissionStatus, participantIds?: string[]) =>
         run(
           withHistory(
