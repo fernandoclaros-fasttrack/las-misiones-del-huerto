@@ -566,18 +566,29 @@ export interface ChildRedeemResult {
   redemptions?: Redemption[]
 }
 
+/** Canjea puntos de un hijo/a por un concepto configurado.
+ *
+ *  `allowNegative` existe porque las dos pantallas tienen reglas distintas sobre el mismo canje
+ *  (MOO2-172). Desde la pantalla del niño/a el saldo insuficiente **bloquea** el canje: es el
+ *  niño/a gastando lo que tiene. Desde el panel de padres **no**, porque ahí un canje no es una
+ *  compra sino el registro de algo que el hijo/a ya ha consumido — típicamente justo después de
+ *  una penalización que le ha dejado sin margen — y bloquearlo impediría anotar un hecho que ya
+ *  ha ocurrido. El saldo puede quedar negativo y se guarda tal cual, igual que ya hacía
+ *  `adjustChildPoints()` con las penalizaciones. Quien decide no es esta función: el actor de
+ *  `useFamilyData` ya distingue ambas pantallas. */
 export function redeemChildPoints(
   data: FamilyData,
   childId: string,
   points: number,
   concept: { emoji: string; label: string },
   idSeed: number,
+  allowNegative: boolean,
 ): ChildRedeemResult {
   const pts = Math.round(points) || 0
   const child = data.children.find((c) => c.id === childId)
   if (!child) return { ok: false, error: 'No se encuentra a ese hijo/a.' }
   if (pts <= 0) return { ok: false, error: 'Introduce cuántos puntos canjear.' }
-  if (pts > child.points) return { ok: false, error: 'No hay suficientes puntos acumulados.' }
+  if (!allowNegative && pts > child.points) return { ok: false, error: 'No hay suficientes puntos acumulados.' }
   const children = data.children.map((c) => (c.id === childId ? { ...c, points: c.points - pts } : c))
   const redemption: Redemption = {
     id: `rd${idSeed}`,
