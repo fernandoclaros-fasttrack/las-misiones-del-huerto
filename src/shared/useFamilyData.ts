@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { doc, onSnapshot, runTransaction, type DocumentReference } from 'firebase/firestore'
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
-import { seedFamilyData } from './constants'
-import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, MissionStatus } from './types'
+import { seedFamilyData, todayISODate } from './constants'
+import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, Mission, MissionStatus } from './types'
 import * as logic from './logic'
 
 type Patch = Partial<FamilyData> | null
@@ -17,6 +17,31 @@ function nextId(): number {
   const now = Date.now()
   lastId = now > lastId ? now : lastId + 1
   return lastId
+}
+
+/** Devuelve a `pendiente` una misión cuyo estado no se puso hoy (MOO2-173).
+ *
+ *  `Day` es una ranura fija de la semana (Lunes=0..Domingo=6), no una fecha: el lunes de esta
+ *  semana y el de la siguiente son literalmente la misma misión. Sin caducidad, lo que un niño
+ *  completó un viernes seguía apareciendo completado el viernes siguiente y para siempre — que es
+ *  justo el bug. La app es estática (GitHub Pages + Firestore), así que no hay backend que pueda
+ *  correr un cron a medianoche: la caducidad tiene que calcularse al leer, aquí.
+ *
+ *  Contrato:
+ *  - **No toca los puntos.** Caducar no es descompletar: los puntos se ganaron de verdad ese día
+ *    y se quedan. Por eso esto vive en `normalize()` y no en un mutador — no genera `changeLog`.
+ *  - Devuelve la misión **tal cual** (misma referencia) si no hay nada que caducar, para no
+ *    invalidar memos río abajo en cada snapshot.
+ *  - Al caducar hay que dejar `participants: []` y **quitar** la clave `statusDate` (Firestore
+ *    rechaza `undefined`, también anidado en un array) — `withStatus()` en logic.ts ya hace las
+ *    dos cosas.
+ *  - Las misiones anteriores a MOO2-173 no tienen `statusDate`: se tratan como caducadas, porque
+ *    no hay forma de saber de qué día eran. */
+function expireStaleStatus(mission: Mission, today: string): Mission {
+  // Una misión `pendiente` no debería llevar `statusDate` encima; si lo lleva (documento
+  // manipulado, copia de seguridad rara), se limpia igual en vez de dejar un campo huérfano.
+  const vigente = mission.status === 'pendiente' ? mission.statusDate === undefined : mission.statusDate === today
+  return vigente ? mission : logic.withStatus(mission, 'pendiente', [])
 }
 
 /** Documentos guardados antes de MOO-17/22 no tienen `children`/`redemptions`, antes de
@@ -37,16 +62,22 @@ function nextId(): number {
  *  desde MOO2-52 las penalizaciones son su propia acción y ningún canje nuevo se marca así. */
 function normalize(raw: FamilyData): FamilyData {
   const children = raw.children ?? []
+  const today = todayISODate()
   const days = raw.days.map((day, di) => ({
     ...day,
     missionOrder: day.missionOrder ?? [],
-    missions: day.missions.map((mi) => ({
-      ...mi,
-      seriesId: mi.seriesId ?? mi.id,
-      activeDays: mi.activeDays ?? [di],
-      participants: mi.participants ?? [],
-      assignedTo: mi.assignedTo ?? children.map((c) => c.id),
-    })),
+    missions: day.missions.map((mi) =>
+      expireStaleStatus(
+        {
+          ...mi,
+          seriesId: mi.seriesId ?? mi.id,
+          activeDays: mi.activeDays ?? [di],
+          participants: mi.participants ?? [],
+          assignedTo: mi.assignedTo ?? children.map((c) => c.id),
+        },
+        today,
+      ),
+    ),
   }))
   const looksLikePenalty = (label: string) => /penaliz/i.test(label)
   const redemptions = (raw.redemptions ?? []).map((r) => ({ ...r, isPenalty: r.isPenalty ?? looksLikePenalty(r.conceptLabel) }))
@@ -166,10 +197,17 @@ async function seedIfMissing(ref: DocumentReference): Promise<void> {
 export function useFamilyData(actor: ChangeActor, enabled: boolean) {
   const [data, setData] = useState<FamilyData | null>(null)
   const [loading, setLoading] = useState(true)
+  /** El documento sin normalizar, tal cual llegó. `normalize()` caduca estados contra la fecha de
+   *  hoy (MOO2-173), así que su resultado deja de valer en cuanto cambia el día: hay que poder
+   *  recalcularlo sin esperar a que Firestore emita otro snapshot. Sin esto, una pantalla abierta
+   *  toda la noche (una tablet en la cocina) amanecía enseñando las misiones de ayer completadas,
+   *  que es exactamente el bug que este campo viene a arreglar. */
+  const rawRef = useRef<FamilyData | null>(null)
 
   useEffect(() => {
     if (!enabled) {
       // Al cerrar sesión no debe quedarse en memoria lo último que se leyó.
+      rawRef.current = null
       setData(null)
       setLoading(true)
       return
@@ -196,7 +234,8 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
             void seedIfMissing(ref).catch((err) => console.error('No se pudo crear el documento inicial:', err))
             return
           }
-          setData(normalize(snap.data() as FamilyData))
+          rawRef.current = snap.data() as FamilyData
+          setData(normalize(rawRef.current))
           setLoading(false)
         },
         (err) => {
@@ -210,9 +249,32 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
       return unsub
     }
     return localStore.subscribe((d) => {
+      rawRef.current = d
       setData(normalize(d))
       setLoading(false)
     })
+  }, [enabled])
+
+  /** Al cruzar la medianoche hay que volver a normalizar lo último que se leyó, para que los
+   *  estados de ayer caduquen sin depender de que alguien recargue o de que llegue otra
+   *  escritura. Mismo mecanismo que usa la pantalla de padres para su día seleccionado: una
+   *  comprobación por minuto más el regreso a la pestaña, y solo hace algo cuando la fecha
+   *  cambia de verdad. */
+  useEffect(() => {
+    if (!enabled) return
+    let day = todayISODate()
+    const sync = () => {
+      const now = todayISODate()
+      if (now === day) return
+      day = now
+      if (rawRef.current) setData(normalize(rawRef.current))
+    }
+    const timer = window.setInterval(sync, 60_000)
+    document.addEventListener('visibilitychange', sync)
+    return () => {
+      window.clearInterval(timer)
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [enabled])
 
   const run = useCallback(async <TResult,>(mutator: Mutator<TResult>): Promise<TResult> => {
