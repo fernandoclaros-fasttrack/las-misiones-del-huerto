@@ -11,6 +11,7 @@ import type {
   Redemption,
   RewardConcept,
 } from './types'
+import { todayISODate } from './constants'
 
 /**
  * Reglas de negocio puras (ver README del handoff de diseño, sección "Reglas de negocio").
@@ -24,6 +25,21 @@ import type {
 function applyParticipantDelta(children: Child[], participantIds: string[], delta: number): Child[] {
   const ids = new Set(participantIds)
   return children.map((c) => (ids.has(c.id) ? { ...c, points: c.points + delta } : c))
+}
+
+/** Aplica un estado a una misión estampando el día en que se pone (MOO2-173). Volver a
+ *  `pendiente` **quita** la clave `statusDate` por destructuring en vez de ponerla a `undefined`:
+ *  Firestore rechaza `undefined` incluso anidado dentro de un array — el mismo motivo por el que
+ *  `editMission` tiene que destructurar `oneOffDate` al convertir una one-off en recurrente.
+ *
+ *  Único sitio que escribe `statusDate`: si mañana aparece otra acción que cambie el estado de
+ *  una misión, pasarla por aquí es lo que evita que nazca con un estado que no caduca nunca. */
+export function withStatus(mission: Mission, status: MissionStatus, participants: string[]): Mission {
+  if (status === 'pendiente') {
+    const { statusDate: _expired, ...rest } = mission
+    return { ...rest, status, participants }
+  }
+  return { ...mission, status, participants, statusDate: todayISODate() }
 }
 
 export function setMissionStatus(
@@ -47,22 +63,22 @@ export function setMissionStatus(
         if (!hasChildren) {
           if (was && !now) acumulado -= mi.points
           if (!was && now) acumulado += mi.points
-          return { ...mi, status }
+          return withStatus(mi, status, mi.participants)
         }
         if (!was && now) {
           // MOO-26: todos los hijos participan por defecto; solo los seleccionados reciben la
           // recompensa completa (no se reparte).
           const participants = participantIds?.length ? participantIds : data.children.map((c) => c.id)
           children = applyParticipantDelta(children, participants, mi.points)
-          return { ...mi, status, participants }
+          return withStatus(mi, status, participants)
         }
         if (was && !now) {
           // Deshace usando los participantes con los que se completó, no la selección actual.
           const participants = mi.participants.length ? mi.participants : data.children.map((c) => c.id)
           children = applyParticipantDelta(children, participants, -mi.points)
-          return { ...mi, status, participants: [] }
+          return withStatus(mi, status, [])
         }
-        return { ...mi, status }
+        return withStatus(mi, status, mi.participants)
       }),
     }
   })
@@ -353,7 +369,9 @@ export function resetCounter(data: FamilyData): Pick<FamilyData, 'acumulado' | '
   const days = data.days.map((day) => ({
     ...day,
     missions: day.missions.map((mi) =>
-      mi.status === 'pendiente' && mi.participants.length === 0 ? mi : { ...mi, status: 'pendiente' as const, participants: [] },
+      mi.status === 'pendiente' && mi.participants.length === 0 && mi.statusDate === undefined
+        ? mi
+        : withStatus(mi, 'pendiente', []),
     ),
   }))
   const children = data.children.map((c) => (c.points === 0 ? c : { ...c, points: 0 }))

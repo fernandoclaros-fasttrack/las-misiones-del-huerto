@@ -25,6 +25,17 @@ export interface Mission {
    *  que se repite ese día de la semana. Ausente = misión recurrente (comportamiento anterior).
    *  Ver `isMissionActiveToday()` en logic.ts. */
   oneOffDate?: string
+  /** Fecha ISO (YYYY-MM-DD) en la que se puso el `status` actual (MOO2-173). Es lo que hace que
+   *  un estado caduque: `normalize()` en useFamilyData.ts devuelve a `pendiente` cualquier misión
+   *  cuyo `statusDate` no sea hoy, porque `Day` es una ranura fija de la semana (Lunes=0..) y no
+   *  una fecha — sin esto, lo completado un viernes seguía completado el viernes siguiente y para
+   *  siempre. Ausente mientras `status === 'pendiente'` (la clave se quita, no se pone a
+   *  `undefined`: Firestore rechaza `undefined` incluso anidado en un array).
+   *
+   *  No confundir con `oneOffDate`, que decide si la misión se **ve**; esta decide cuánto dura su
+   *  estado. Caducar no es descompletar: los puntos ya ganados no se tocan ni se registra nada en
+   *  `changeLog`. */
+  statusDate?: string
 }
 
 /** Plantilla de misión reutilizable (MOO2-57): recuerda el título, puntos y emoji de una misión

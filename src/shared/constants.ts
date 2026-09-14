@@ -75,12 +75,18 @@ export function nextDateForWeekday(weekdayIdx: number): string {
 }
 
 function seedDays(): Day[] {
+  // El estado de una misión caduca al cambiar el día (MOO2-173), así que los datos de ejemplo
+  // tienen que nacer con la fecha de hoy puesta: sin ella se caducarían en la primera lectura y
+  // el fallback de desarrollo arrancaría con todo `pendiente` —  sin ninguna forma de ver los
+  // chips de progreso/bloqueada/completada, y con un `acumulado` sembrado que ya no cuadraría con
+  // ninguna misión visible.
   const m = (id: string, emoji: string, title: string, points: number, status: MissionStatus = 'pendiente') => ({
     id,
     emoji,
     title,
     points,
     status,
+    ...(status === 'pendiente' ? {} : { statusDate: todayISODate() }),
   })
   type RawDay = { label: string; short: string; missions: ReturnType<typeof m>[] }
   const D = (label: string, short: string, missions: RawDay['missions']): RawDay => ({ label, short, missions })
