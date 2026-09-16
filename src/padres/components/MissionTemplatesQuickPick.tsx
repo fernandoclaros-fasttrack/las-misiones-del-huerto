@@ -5,6 +5,11 @@ import type { MissionTemplate } from '../../shared/types'
 interface Props {
   templates: MissionTemplate[]
   selectedIds: string[]
+  /** Etiqueta del día elegido en el formulario de abajo cuando la misión se va a crear como
+   *  puntual (MOO2-168), p. ej. "sábado 20 sep". El control de recurrencia vive en ese formulario
+   *  y no aquí — duplicarlo daría dos interruptores idénticos con significados distintos — así
+   *  que el botón lo repite en su texto para que se vea desde la lista qué va a crear. */
+  oneOffLabel?: string
   onToggleSelect: (id: string) => void
   onCreateSelected: () => void
   onEditTemplate: (id: string, changes: { title: string; points: number }) => void
@@ -15,7 +20,7 @@ interface Props {
  *  elegir una o varias de golpe (MOO2-58) en vez de escribirlas de cero, y editar/borrar cada
  *  entrada (MOO2-59/60) sin tocar ninguna misión ya programada. Se oculta por completo hasta que
  *  exista al menos una plantilla (la primera misión creada a mano ya la alimenta). */
-export function MissionTemplatesQuickPick({ templates, selectedIds, onToggleSelect, onCreateSelected, onEditTemplate, onDeleteTemplate }: Props) {
+export function MissionTemplatesQuickPick({ templates, selectedIds, oneOffLabel, onToggleSelect, onCreateSelected, onEditTemplate, onDeleteTemplate }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftPoints, setDraftPoints] = useState<number | string>(0)
@@ -95,6 +100,7 @@ export function MissionTemplatesQuickPick({ templates, selectedIds, onToggleSele
         style={{ ...BTN_SAVE, width: '100%', marginTop: 10, opacity: selectedIds.length === 0 ? 0.5 : 1, cursor: selectedIds.length === 0 ? 'not-allowed' : 'pointer' }}
       >
         Crear{selectedIds.length > 0 ? ` (${selectedIds.length})` : ''}
+        {oneOffLabel ? ` para el ${oneOffLabel}` : ''}
       </button>
     </div>
   )

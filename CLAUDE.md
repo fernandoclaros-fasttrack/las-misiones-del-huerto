@@ -1,5 +1,7 @@
 # Las misiones del huerto
 
+<!-- moon-develop: ciclo configurado (2026-09-15) -->
+
 Family chore-gamification app. Two static screens (kids / parents) sharing one Firestore
 document, deployed to GitHub Pages. See [README.md](./README.md) for setup/deploy instructions
 and [design_handoff_misiones_del_huerto/README.md](./design_handoff_misiones_del_huerto/README.md)
@@ -19,11 +21,32 @@ for the original design spec (tokens, business rules, data model).
 - Linear's `save_issue` has silently dropped a label and an acceptance-criteria line that the
   edit never touched. Pass `labels` explicitly on every call and re-read the returned issue to
   check nothing else changed.
-- When implementing a story: move it to **In Progress** when starting, then to **In Review**
-  (or "PR Review") once implemented and verified against production — code review only runs
-  once a ticket is in that column. Once code review findings are resolved, move it straight to
-  **Done** yourself; there's no separate step where Fernando has to sign off on the acceptance
-  criteria before Done.
+- **El ciclo de un ticket, entero** (el mismo que en `tasks-board`; la skill `/moon-develop` lo
+  describe fase a fase):
+  1. **In Progress** al empezar.
+  2. Implementar y **verificarlo el agente** (build, lint, y probarlo en el navegador como un
+     usuario, contra el Firestore de producción cuando haya credenciales).
+  3. PR **en draft** y ticket a **In Review**: code review sobre el diff de la rama, arreglos en
+     la misma rama y re-verificación. Aquí no se le pregunta nada a Fernando.
+  4. Sin hallazgos abiertos: PR a *ready* y mergear. El push a `main` despliega solo.
+  5. Ticket a **Test AC** y **avisar a Fernando de que ya lo puede probar**, con el bloque de
+     cierre (`references/aviso-final.md` de la skill). **Aquí se para.**
+  6. Cuando él dice «probado y bien» → **Done** y limpiar.
+     **Test AC → Done es la única transición que no decide el agente.** Y puede cerrarlo él por su
+     cuenta desde el enlace del aviso: un ticket que aparezca en `Done` sin que se lo hayamos
+     movido **es un ok suyo**, se le hace la limpieza en silencio y no se le pregunta nada.
+  7. Si en vez del ok trae un hallazgo, vuelve a **In Progress**, se arregla, se revisa **el
+     arreglo** y vuelve a Test AC.
+- **Esto deroga lo que este fichero decía antes** («tras la code review el ticket va directo a
+  Done sin que Fernando firme los criterios de aceptación»). Lo cambió él el 2026-09-15: el merge
+  sigue sin pedirle permiso, pero **enterarse de lo que ha caído y probarlo antes de cerrarlo sí
+  lo quiere**, igual que en su otro proyecto.
+- **La code review va ANTES de mergear**, no después de que él lo pruebe. Lo que entra en `main`
+  es la base del ticket siguiente, la haya probado él o no.
+- **Ojo: hoy este repo no tiene CI en los PRs.** El único workflow corre en el push a `main` y
+  despliega, así que un PR aquí no tiene ningún check y `gh pr checks` sale con 0 diciendo «no
+  checks reported» — el `&&` del gate de merge **no protege nada aquí**. Mientras siga así, el
+  gate es haber corrido `npm run build` y `npm run lint` a mano antes de mergear, y decirlo.
 - Two labels, two different authorities: a technical-readiness label (e.g. "Specs Ready") can
   be added/removed freely. **"Needs Refinement" is never removed unilaterally** — only Fernando
   removes it, or explicitly authorizes removing it in the moment, since it encodes whether the
@@ -39,14 +62,15 @@ for the original design spec (tokens, business rules, data model).
 
 ## Merging
 
-Once a ticket has passed code review and is Done, merge it without stopping to ask for manual
-confirmation: commit on the ticket's feature branch (matching Linear's `gitBranchName`), push,
-open a PR (short summary + test plan), then merge and delete the branch, then switch local back
-to `main` and pull. This includes pushing to `main`, which auto-triggers a production deploy —
-that's expected and fine here, not a reason to pause. This is deliberately looser than the
-general default caution around production-deploying merges: Fernando has said this app is for
-himself and his kids, not a business serving live customers, so asking every time is friction
-without a matching risk reduction.
+Una vez resuelta la code review (paso 3 del ciclo de arriba) el merge no pide confirmación:
+commit en la rama del ticket (la de `gitBranchName` de Linear), push, PR con resumen y plan de
+prueba, mergear, borrar la rama, y volver local a `main` con `pull`. El push a `main` dispara el
+deploy a producción, y eso es lo esperado aquí, no un motivo para parar: es deliberadamente más
+suelto que la precaución habitual porque esta app es para él y sus hijos, no un negocio con
+clientes vivos, así que preguntar cada vez es fricción sin riesgo que la justifique.
+
+**Lo que sí se para es lo de después**: mergeado y desplegado, el ticket va a `Test AC` con el
+bloque de aviso, y ahí espera. `Done` lo decide él (o lo cierra él mismo por el enlace).
 
 ## Architecture decisions that aren't obvious from the code
 

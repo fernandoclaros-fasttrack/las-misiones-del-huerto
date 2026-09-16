@@ -3,6 +3,7 @@ import { doc, onSnapshot, runTransaction, type DocumentReference } from 'firebas
 import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData, todayISODate } from './constants'
+import { useToday } from './useToday'
 import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, Mission, MissionStatus } from './types'
 import * as logic from './logic'
 
@@ -257,25 +258,14 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
 
   /** Al cruzar la medianoche hay que volver a normalizar lo último que se leyó, para que los
    *  estados de ayer caduquen sin depender de que alguien recargue o de que llegue otra
-   *  escritura. Mismo mecanismo que usa la pantalla de padres para su día seleccionado: una
-   *  comprobación por minuto más el regreso a la pestaña, y solo hace algo cuando la fecha
-   *  cambia de verdad. */
+   *  escritura. El reloj es el mismo `useToday()` que usan las dos pantallas para su día
+   *  seleccionado (MOO2-169): con un temporizador propio aquí, los datos y la pestaña que los
+   *  enseña podían cambiar de día en momentos distintos. Sin documento leído todavía no hay nada
+   *  que recalcular, así que la primera pasada (al montar) no hace nada. */
+  const [today] = useToday()
   useEffect(() => {
-    if (!enabled) return
-    let day = todayISODate()
-    const sync = () => {
-      const now = todayISODate()
-      if (now === day) return
-      day = now
-      if (rawRef.current) setData(normalize(rawRef.current))
-    }
-    const timer = window.setInterval(sync, 60_000)
-    document.addEventListener('visibilitychange', sync)
-    return () => {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', sync)
-    }
-  }, [enabled])
+    if (rawRef.current) setData(normalize(rawRef.current))
+  }, [today])
 
   const run = useCallback(async <TResult,>(mutator: Mutator<TResult>): Promise<TResult> => {
     if (firebaseEnabled && firestore) {
@@ -401,7 +391,13 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
       // asignación (el contexto de "Añadir misión" desde el que se abrió la lista rápida). Se
       // encadenan sobre `days` en vez de partir de `d.days` en cada vuelta para que ninguna
       // creación pise a la anterior.
-      createMissionsFromTemplates: (templateIds: string[], dayIndices: number[], assignedTo: string[]) =>
+      //
+      // Con `oneOffDate` las crea puntuales (MOO2-168), todas en la misma fecha: quien llama ya ha
+      // pasado `dayIndices` como el único día de la semana de esa fecha (`weekdayOfISODate`), que
+      // es el contrato de `addMission`. La lista rápida no se toca en ningún caso — ni al crear
+      // desde ella (sería volver a añadir lo mismo) ni al elegir el tipo de recurrencia, que no es
+      // algo que la plantilla recuerde.
+      createMissionsFromTemplates: (templateIds: string[], dayIndices: number[], assignedTo: string[], oneOffDate?: string) =>
         run((d) => {
           let days = d.days
           for (const templateId of templateIds) {
@@ -409,7 +405,7 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
             if (!template) continue
             const result = logic.addMission(
               { ...d, days },
-              { emoji: template.emoji, title: template.title, points: template.points, dayIndices, assignedTo },
+              { emoji: template.emoji, title: template.title, points: template.points, dayIndices, assignedTo, ...(oneOffDate ? { oneOffDate } : {}) },
               nextId(),
             )
             days = result.days

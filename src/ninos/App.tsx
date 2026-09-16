@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useFamilyData } from '../shared/useFamilyData'
 import { useAuth } from '../shared/useAuth'
 import { LoginScreen } from '../shared/components/LoginScreen'
-import { ACCENT, todayIndex, todayISODate } from '../shared/constants'
+import { ACCENT, weekdayOfISODate } from '../shared/constants'
+import { useDayFollowingToday, useToday } from '../shared/useToday'
 import { DayTabs } from '../shared/components/DayTabs'
 import { Header } from './components/Header'
 import { MissionCard } from './components/MissionCard'
@@ -23,7 +24,12 @@ export default function App() {
   // renders en los que más abajo se devuelve la pantalla de login, así que sin esto la
   // suscripción se abría sin sesión.
   const { data, loading, setMissionStatus, redeemChildPoints } = useFamilyData('hijo', isAuthed)
-  const [selected, setSelected] = useState(todayIndex())
+  // La tablet de la cocina se queda abierta toda la noche en esta pantalla (MOO2-169): la fecha y
+  // el día seleccionado tienen que seguir al día real por su cuenta. Si se calcularan al montar,
+  // por la mañana el niño se encontraría la lista de ayer — con las puntuales de ayer dentro y sin
+  // la de hoy — y ni tocando nada cambiaría.
+  const [today] = useToday()
+  const [selected, setSelected] = useDayFollowingToday(weekdayOfISODate(today))
   const [activeChildId, setActiveChildId] = useState<string | null>(() => localStorage.getItem(ACTIVE_CHILD_KEY))
   const [screen, setScreen] = useState<'missions' | 'redeem' | 'points'>('missions')
 
@@ -140,7 +146,6 @@ export default function App() {
   }
 
   const day = data.days[selected]
-  const today = todayISODate()
   const missions = (day ? sortedMissions(day) : []).filter((m) => isMissionVisibleTo(m, activeChild.id) && isMissionActiveToday(m, today))
   const doneCount = missions.filter((m) => m.status === 'completada').length
   const points = activeChild.points
@@ -178,7 +183,7 @@ export default function App() {
           />
         ) : (
           <>
-            <DayTabs days={data.days} selected={selected} onSelect={setSelected} accent={ACCENT} variant="ninos" />
+            <DayTabs days={data.days} selected={selected} onSelect={setSelected} accent={ACCENT} todayIdx={weekdayOfISODate(today)} variant="ninos" />
 
             <main style={{ flex: 1, padding: '8px 16px 44px', display: 'flex', flexDirection: 'column', gap: 12 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '4px 6px 2px' }}>

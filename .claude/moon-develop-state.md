@@ -16,15 +16,19 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
   (`cff74647-819f-429b-997b-240fb76afe37`).
 - Ojo: `CLAUDE.md` llama al equipo "Moon Personal", pero lo que devuelve la API es **Moon 2**.
   Existe además un equipo distinto llamado "Moon" con prefijo `MOO` que no es este.
-- Columnas reales del tablero: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done`, más
-  `Canceled`. **No hay columna de prueba de aceptación** (ningún "Test AC"), y `CLAUDE.md` lo dice
-  explícitamente: tras resolver la code review el ticket va directo a `Done` sin que Fernando
-  tenga que firmar los criterios de aceptación. Esa regla del proyecto gana sobre el gate por
-  defecto de la skill.
+- Columnas del tablero: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done`, más
+  `Canceled`. **Falta `Test AC`**: el 2026-09-15 Fernando pidió el mismo ciclo que en
+  `tasks-board` (probarlo él antes de que el ticket se cierre), así que **hay que crear esa
+  columna en Linear** entre `In Review` y `Done` antes del siguiente ticket. Hasta que exista, el
+  ticket se queda en `In Review` con el aviso dado y **no se cierra**. Lo que este fichero decía
+  antes («no hay columna de prueba, va directo a Done») está derogado.
 
 **Convenciones que ya están leídas de `CLAUDE.md`** (resumen; el original manda)
-- Merge sin preguntar una vez pasada la code review, incluido el push a `main`, que despliega a
-  producción. Es deliberado: la app es para su familia, no para clientes.
+- La code review va **antes** del merge; el merge no pide confirmación y el push a `main`
+  despliega a producción. Es deliberado: la app es para su familia, no para clientes.
+- **No hay CI en los PRs** (el único workflow corre al pushear a `main` y despliega), así que el
+  `&&` del gate de merge no protege nada aquí: el gate es `npm run build` y `npm run lint` a mano
+  antes de mergear, y decir que se han corrido.
 - La etiqueta "Needs Refinement" **no se quita nunca por iniciativa propia**; una de preparación
   técnica ("Specs Ready") sí.
 - `save_issue` de Linear ha llegado a soltar etiquetas que la edición no tocaba: pasa `labels`
