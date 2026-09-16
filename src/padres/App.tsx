@@ -16,7 +16,8 @@ import { ChangeHistoryView } from './components/ChangeHistoryView'
 import { RestoreBackupView } from './components/RestoreBackupView'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
-import { sortedMissions, sortedMissionSeries, byTitle, isMissionCurrentForParents } from '../shared/logic'
+import { sortedMissions, sortedMissionSeries, byTitle, isMissionCurrentForParents, oneOffDateLabel } from '../shared/logic'
+import { useDayFollowingToday, useToday } from '../shared/useToday'
 import type { Mission } from '../shared/types'
 
 interface Draft {
@@ -68,7 +69,6 @@ export default function App() {
     restoreBackup,
   } = useFamilyData('padre', isAuthed)
 
-  const [selected, setSelected] = useState(todayIndex())
   const [showHistory, setShowHistory] = useState(false)
   /** Pantalla de restaurar copia (MOO2-100), al mismo nivel que el historial: sustituye el área
    *  de misiones en vez de abrirse encima, porque es un flujo de varios pasos (elegir fichero,
@@ -102,23 +102,15 @@ export default function App() {
    *  guarda `seriesId`, no `id` de misión. */
   const [pendingGlobalOrder, setPendingGlobalOrder] = useState<string[] | null>(null)
 
-  /** Qué día es hoy, para el filtro de las misiones puntuales (MOO2-167). No puede calcularse
-   *  en cada render y quedarse ahí: esta app vive en la tablet de la cocina, así que el panel
-   *  cruza la medianoche abierto y sin repintarse. Con la fecha congelada, la lista seguiría
-   *  enseñando una puntual de ayer y `saveMission`, que sí mira el día real, la rechazaría con
-   *  un "esa fecha ya ha pasado" sobre una tarjeta que se ve perfectamente al día. Las dos
-   *  mitades leen de aquí, así que no pueden discrepar. Se refresca al volver a la pestaña y
-   *  con una comprobación por minuto, y solo repinta el día que el valor cambia de verdad. */
-  const [today, setToday] = useState(todayISODate)
-  useEffect(() => {
-    const sync = () => setToday((prev) => (todayISODate() === prev ? prev : todayISODate()))
-    const timer = window.setInterval(sync, 60_000)
-    document.addEventListener('visibilitychange', sync)
-    return () => {
-      window.clearInterval(timer)
-      document.removeEventListener('visibilitychange', sync)
-    }
-  }, [])
+  /** Qué día es hoy, para el filtro de las misiones puntuales (MOO2-167) y para el día que se
+   *  enseña seleccionado (MOO2-169). No puede calcularse en cada render y quedarse ahí: esta app
+   *  vive en la tablet de la cocina, así que el panel cruza la medianoche abierto y sin
+   *  repintarse. Con la fecha congelada, la lista seguiría enseñando una puntual de ayer y
+   *  `saveMission`, que sí mira el día real, la rechazaría con un "esa fecha ya ha pasado" sobre
+   *  una tarjeta que se ve perfectamente al día. Todo lo que depende del día cuelga de aquí — el
+   *  filtro, la pestaña seleccionada y el punto de "hoy" — así que nada puede discrepar. */
+  const [today, syncToday] = useToday()
+  const [selected, setSelected] = useDayFollowingToday(weekdayOfISODate(today))
 
   /** Y si el día cambia con el formulario de alta abierto, la fecha que ese formulario traía
    *  puesta sola (hoy, al abrirlo) se queda en el pasado sin que nadie la haya elegido, y al
@@ -273,49 +265,78 @@ export default function App() {
   function setDraftOneOffDate(date: string) {
     setDraft((d) => ({ ...d, oneOffDate: date }))
   }
+  /** Resuelve la fecha con la que se va a guardar una misión puntual, o `null` si no se puede
+   *  guardar (y en ese caso ya ha avisado). Lo usan el alta/edición del formulario y la creación
+   *  desde la lista rápida (MOO2-168), que tienen exactamente las mismas trampas:
+   *
+   *  - Se mide contra el día real y no contra el `today` pintado: el panel puede llevar abierto
+   *    desde ayer y el minuto del reloj que lo refresca puede no haber saltado todavía. De paso
+   *    pone la lista al día, para que nada de lo que salga después contradiga lo que se ve.
+   *  - Una fecha puesta por el formulario que se ha quedado en ayer se adelanta: entre la
+   *    medianoche y el minuto siguiente hay un hueco, y guardar dentro de él devolvía un aviso
+   *    sobre una fecha que nadie eligió. Nunca sobre una misión ya completada: adelantarla la
+   *    mudaría de día de la semana, y a una completada eso le borra la copia y **le quita a los
+   *    niños los puntos ya dados**. Ahí es mejor el aviso, y que la fecha la elija una persona.
+   *  - La fecha que la misión ya tenía guardada (`suFechaDeAntes`) se deja volver a guardar tal
+   *    cual aunque ya haya pasado: rechazarla obligaría a reprogramarla solo para corregirle el
+   *    título, con el descuento de puntos que eso arrastra. Lo que sí se rechaza es una fecha
+   *    pasada elegida a mano, que dejaría una misión que no se puede ni ver ni corregir. El `min`
+   *    de los selectores guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea. */
+  function resolverFechaPuntual(suFechaDeAntes: string | undefined, yaCompletada: boolean): string | null {
+    // El input de fecha nativo se puede dejar vacío (borrando todos los dígitos); sin esta
+    // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
+    // editar, eso borraría la única copia existente sin crear una de repuesto.
+    if (!draft.oneOffDate) return null
+    const realToday = todayISODate()
+    if (realToday !== today) syncToday()
+    const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes && !yaCompletada ? realToday : draft.oneOffDate
+    if (fecha < realToday && fecha !== suFechaDeAntes) {
+      showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
+      return null
+    }
+    return fecha
+  }
+  /** Día de la semana y fecha de una puntual, p. ej. "sábado 20 sep", para los avisos. */
+  function etiquetaDeFecha(iso: string): string {
+    return `${data!.days[weekdayOfISODate(iso)]?.label.toLowerCase() ?? ''} ${oneOffDateLabel(iso)}`.trim()
+  }
+  /** Una misión puntual se guarda en el `Day` de su fecha, que no tiene por qué ser el día que el
+   *  padre está viendo: sin esto el formulario se cerraba sobre una lista idéntica y parecía que
+   *  no había pasado nada (MOO2-169), así que se creaba otra vez. Se le lleva al día donde ha
+   *  caído y se le dice cuál es. En la vista "Todo" no hay a dónde llevarle — la misión ya sale en
+   *  esa lista — así que solo se avisa. */
+  function avisarDelDiaPuntual(dayIdx: number, mensaje: string) {
+    if (!globalView && dayIdx === selected) return
+    if (!globalView) setSelected(dayIdx)
+    showToast(mensaje)
+  }
   async function saveMission() {
     if (!draft.title.trim()) return
     const points = Number(draft.points) || 0
     if (draft.isOneOff) {
-      // El input de fecha nativo se puede dejar vacío (borrando todos los dígitos); sin esta
-      // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
-      // editar, eso borraría la única copia existente sin crear una de repuesto.
-      if (!draft.oneOffDate) return
-      // Se mide contra el día real y no contra el `today` pintado: el panel puede llevar abierto
-      // desde ayer y el minuto del reloj que lo refresca puede no haber saltado todavía. De paso
-      // pone la lista al día, para que nada de lo que salga a continuación contradiga lo que se
-      // ve. Lo que sigue son las dos mitades de la misma regla, alta y edición.
-      const realToday = todayISODate()
-      if (realToday !== today) setToday(realToday)
-      // La fecha que la misión ya tenía guardada, si se está editando una. Es lo que distingue
-      // "esta fecha la eligió el usuario o la puso la misión" de "la rellenó el formulario".
+      // La misión que se está editando, si la hay. Su fecha guardada es lo que distingue "esta
+      // fecha la eligió el usuario" de "la rellenó el formulario".
       const misionEditada = editingId && editingId !== 'new'
         ? data!.days.flatMap((d) => d.missions).find((mi) => mi.id === editingId)
         : undefined
-      const suFechaDeAntes = misionEditada?.oneOffDate
-      // Una fecha puesta por el formulario que se ha quedado en ayer se adelanta también aquí,
-      // no solo en el refresco por minuto: entre la medianoche y el minuto siguiente hay un
-      // hueco, y guardar dentro de él devolvía un aviso sobre una fecha que nadie eligió.
-      // Nunca sobre una misión ya completada: adelantarla la mudaría de día de la semana, y a
-      // una completada eso le borra la copia y **le quita a los niños los puntos ya dados**.
-      // Ahí es mejor el aviso, y que la fecha nueva la elija una persona.
-      const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes && misionEditada?.status !== 'completada'
-        ? realToday
-        : draft.oneOffDate
-      // Y la fecha de una misión que ya existe se deja volver a guardar tal cual aunque ya haya
-      // pasado: rechazarla obligaría a reprogramarla solo para corregirle el título, con el
-      // descuento de puntos que eso arrastra. Lo que sí se rechaza es una fecha pasada elegida a
-      // mano, que dejaría una misión que no se puede ni ver ni corregir. El `min` de los dos
-      // selectores guía el gesto; esto cierra lo que se teclea, que el `min` no bloquea.
-      if (fecha < realToday && fecha !== suFechaDeAntes) {
-        showToast('Esa fecha ya ha pasado: elige hoy o un día futuro')
-        return
-      }
+      const fecha = resolverFechaPuntual(misionEditada?.oneOffDate, misionEditada?.status === 'completada')
+      if (fecha === null) return
       const dayIdx = weekdayOfISODate(fecha)
       if (editingId === 'new') {
         await addMission({ emoji: draft.emoji, title: draft.title, points, dayIndices: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
-      } else if (editingId) {
+        setEditingId(null)
+        avisarDelDiaPuntual(dayIdx, `Creada para el ${etiquetaDeFecha(fecha)}`)
+        return
+      }
+      if (editingId) {
+        // Editar también puede mudar la misión de día (cambiarle la fecha a otro día de la
+        // semana). Ahí la tarjeta desaparece de la lista que el padre tiene delante, así que
+        // decirle dónde ha ido importa aún más que al crearla.
+        const seMuda = !!misionEditada && !misionEditada.activeDays.includes(dayIdx)
         await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
+        setEditingId(null)
+        if (seMuda) avisarDelDiaPuntual(dayIdx, `Movida al ${etiquetaDeFecha(fecha)}`)
+        return
       }
       setEditingId(null)
       return
@@ -339,14 +360,36 @@ export default function App() {
   function toggleTemplateSelection(id: string) {
     setSelectedTemplateIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]))
   }
+  /** Crea de golpe las misiones marcadas en la lista rápida (MOO2-58). Que sean recurrentes o
+   *  puntuales, y con qué fecha, sale del formulario de "Nueva misión" que hay justo debajo de la
+   *  lista (MOO2-168): es el mismo borrador, así que no hay dos controles de recurrencia que
+   *  puedan decir cosas distintas, y el botón "Crear" enseña la fecha elegida para que se vea sin
+   *  bajar la vista qué va a pasar. Varias seleccionadas se crean todas en la misma fecha —
+   *  decisión del ticket: una puntual se crea para algo que hace falta ya, y una fecha por misión
+   *  sería coste sin caso detrás. */
   async function handleCreateFromTemplates() {
     if (!selectedTemplateIds.length) return
-    const dayIdx = globalView ? todayIndex() : selected
     const count = selectedTemplateIds.length
-    await createMissionsFromTemplates(selectedTemplateIds, [dayIdx], data!.children.map((c) => c.id))
+    const kids = data!.children.map((c) => c.id)
+    const hechas = `${count} ${count === 1 ? 'misión creada' : 'misiones creadas'}`
+    if (draft.isOneOff) {
+      // Aquí siempre son misiones nuevas: no hay fecha guardada que respetar ni misión completada
+      // que proteger, así que las dos excepciones de `resolverFechaPuntual` no llegan a aplicar.
+      const fecha = resolverFechaPuntual(undefined, false)
+      if (fecha === null) return
+      const dayIdx = weekdayOfISODate(fecha)
+      await createMissionsFromTemplates(selectedTemplateIds, [dayIdx], kids, fecha)
+      setSelectedTemplateIds([])
+      setEditingId(null)
+      if (!globalView && dayIdx !== selected) setSelected(dayIdx)
+      showToast(`${hechas} para el ${etiquetaDeFecha(fecha)}`)
+      return
+    }
+    const dayIdx = globalView ? todayIndex() : selected
+    await createMissionsFromTemplates(selectedTemplateIds, [dayIdx], kids)
     setSelectedTemplateIds([])
     setEditingId(null)
-    showToast(`${count} ${count === 1 ? 'misión creada' : 'misiones creadas'}`)
+    showToast(hechas)
   }
   async function handleDeleteMission(mission: Mission) {
     await deleteMission(selected, mission.id)
@@ -492,6 +535,7 @@ export default function App() {
               selected={selected}
               onSelect={selectDay}
               accent={ACCENT}
+              todayIdx={weekdayOfISODate(today)}
               variant="padres"
               extraTab={{ label: 'Todo', selected: globalView, onSelect: selectGlobalView }}
             />
@@ -529,6 +573,7 @@ export default function App() {
                   onDelete={(m) => void handleGlobalDeleteMission(m)}
                   templates={data.missionTemplates}
                   selectedTemplateIds={selectedTemplateIds}
+                  templateOneOffLabel={draft.isOneOff && draft.oneOffDate ? etiquetaDeFecha(draft.oneOffDate) : undefined}
                   onToggleTemplateSelect={toggleTemplateSelection}
                   onCreateFromTemplates={() => void handleCreateFromTemplates()}
                   onEditTemplate={(id, changes) => void editMissionTemplate(id, changes)}
@@ -546,6 +591,7 @@ export default function App() {
                       <MissionTemplatesQuickPick
                         templates={data.missionTemplates}
                         selectedIds={selectedTemplateIds}
+                        oneOffLabel={draft.isOneOff && draft.oneOffDate ? etiquetaDeFecha(draft.oneOffDate) : undefined}
                         onToggleSelect={toggleTemplateSelection}
                         onCreateSelected={() => void handleCreateFromTemplates()}
                         onEditTemplate={(id, changes) => void editMissionTemplate(id, changes)}

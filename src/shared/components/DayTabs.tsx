@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react'
 import type { Day } from '../types'
-import { todayIndex } from '../constants'
 
 interface ExtraTab {
   label: string
@@ -13,6 +12,10 @@ interface Props {
   selected: number
   onSelect: (index: number) => void
   accent: string
+  /** Día de la semana de hoy (Lunes=0..Domingo=6), para el punto de "hoy". Lo pasa la pantalla
+   *  en vez de calcularlo aquí (MOO2-169): así el punto y el día seleccionado salen de la misma
+   *  fecha viva y no pueden señalar días distintos tras cruzar la medianoche con la app abierta. */
+  todayIdx: number
   /** 'ninos' usa radio 15px y padding vertical ligeramente mayor que 'padres' (14px), fiel al handoff. */
   variant: 'ninos' | 'padres'
   /** Pestaña adicional tras los días (MOO-30), p. ej. "Todo" para la vista global de misiones
@@ -20,9 +23,8 @@ interface Props {
   extraTab?: ExtraTab
 }
 
-export function DayTabs({ days, selected, onSelect, accent, variant, extraTab }: Props) {
+export function DayTabs({ days, selected, onSelect, accent, todayIdx, variant, extraTab }: Props) {
   const radius = variant === 'ninos' ? 15 : 14
-  const today = todayIndex()
   const borderColor = variant === 'ninos' ? '#E4DBC8' : '#DCD1B9'
 
   return (
@@ -51,7 +53,7 @@ export function DayTabs({ days, selected, onSelect, accent, variant, extraTab }:
       )}
       {days.map((d, i) => {
         const on = i === selected && !extraTab?.selected
-        const isToday = i === today
+        const isToday = i === todayIdx
         const style: CSSProperties = on
           ? {
               flex: '0 0 auto',

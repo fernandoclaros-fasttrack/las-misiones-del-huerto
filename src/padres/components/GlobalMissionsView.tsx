@@ -39,6 +39,8 @@ interface Props {
   /** Lista rápida de misiones ya creadas (MOO2-57/58), mostrada junto al formulario de alta. */
   templates: MissionTemplate[]
   selectedTemplateIds: string[]
+  /** Etiqueta del día si el borrador es puntual (MOO2-168); ver `oneOffLabel` en la lista rápida. */
+  templateOneOffLabel?: string
   onToggleTemplateSelect: (id: string) => void
   onCreateFromTemplates: () => void
   onEditTemplate: (id: string, changes: { title: string; points: number }) => void
@@ -83,6 +85,7 @@ export function GlobalMissionsView({
   onDelete,
   templates,
   selectedTemplateIds,
+  templateOneOffLabel,
   onToggleTemplateSelect,
   onCreateFromTemplates,
   onEditTemplate,
@@ -100,6 +103,7 @@ export function GlobalMissionsView({
           <MissionTemplatesQuickPick
             templates={templates}
             selectedIds={selectedTemplateIds}
+            oneOffLabel={templateOneOffLabel}
             onToggleSelect={onToggleTemplateSelect}
             onCreateSelected={onCreateFromTemplates}
             onEditTemplate={onEditTemplate}
