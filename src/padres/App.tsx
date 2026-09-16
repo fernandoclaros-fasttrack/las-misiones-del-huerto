@@ -285,8 +285,13 @@ export default function App() {
   function resolverFechaPuntual(suFechaDeAntes: string | undefined, yaCompletada: boolean): string | null {
     // El input de fecha nativo se puede dejar vacío (borrando todos los dígitos); sin esta
     // comprobación, weekdayOfISODate('') da NaN y la misión no encaja en ningún día real — al
-    // editar, eso borraría la única copia existente sin crear una de repuesto.
-    if (!draft.oneOffDate) return null
+    // editar, eso borraría la única copia existente sin crear una de repuesto. Avisa en vez de
+    // no hacer nada porque el botón "Crear" de la lista rápida está *encima* del campo de fecha:
+    // desde ahí, un botón que no responde no tiene ninguna explicación a la vista.
+    if (!draft.oneOffDate) {
+      showToast('Elige el día de la misión')
+      return null
+    }
     const realToday = todayISODate()
     if (realToday !== today) syncToday()
     const fecha = draft.oneOffDate === today && draft.oneOffDate !== suFechaDeAntes && !yaCompletada ? realToday : draft.oneOffDate
@@ -329,10 +334,15 @@ export default function App() {
         return
       }
       if (editingId) {
-        // Editar también puede mudar la misión de día (cambiarle la fecha a otro día de la
-        // semana). Ahí la tarjeta desaparece de la lista que el padre tiene delante, así que
-        // decirle dónde ha ido importa aún más que al crearla.
-        const seMuda = !!misionEditada && !misionEditada.activeDays.includes(dayIdx)
+        // Editar también puede mudar la misión de día: cambiándole la fecha a otro día de la
+        // semana, o convirtiendo una recurrente en puntual (MOO2-61), que la deja viviendo solo
+        // en el día de su fecha. Ahí la tarjeta desaparece de la lista que el padre tiene
+        // delante, así que decirle dónde ha ido importa aún más que al crearla. La pregunta es
+        // si la misión sigue viviendo exactamente donde vivía, y por eso no vale con
+        // `activeDays.includes(dayIdx)`: una recurrente de lunes a domingo ya "incluye" el
+        // sábado, y convertirla en puntual del sábado se quedaba sin aviso justo ahí.
+        const vivíaSoloAhí = misionEditada?.activeDays.length === 1 && misionEditada.activeDays[0] === dayIdx
+        const seMuda = !!misionEditada && !vivíaSoloAhí
         await editMission(editingId, { emoji: draft.emoji, title: draft.title, points, activeDays: [dayIdx], assignedTo: draft.assignedTo, oneOffDate: fecha })
         setEditingId(null)
         if (seMuda) avisarDelDiaPuntual(dayIdx, `Movida al ${etiquetaDeFecha(fecha)}`)
