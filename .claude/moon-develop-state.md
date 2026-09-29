@@ -16,12 +16,8 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
   (`cff74647-819f-429b-997b-240fb76afe37`).
 - Ojo: `CLAUDE.md` llama al equipo "Moon Personal", pero lo que devuelve la API es **Moon 2**.
   Existe además un equipo distinto llamado "Moon" con prefijo `MOO` que no es este.
-- Columnas del tablero: `Backlog` → `Todo` → `In Progress` → `In Review` → `Done`, más
-  `Canceled`. **Falta `Test AC`**: el 2026-09-15 Fernando pidió el mismo ciclo que en
-  `tasks-board` (probarlo él antes de que el ticket se cierre), así que **hay que crear esa
-  columna en Linear** entre `In Review` y `Done` antes del siguiente ticket. Hasta que exista, el
-  ticket se queda en `In Review` con el aviso dado y **no se cierra**. Lo que este fichero decía
-  antes («no hay columna de prueba, va directo a Done») está derogado.
+- Columnas del tablero: `Backlog` → `Todo` → `In Progress` → `In Review` → `Test AC` → `Done`,
+  más `Canceled` y `Duplicate`.
 
 **Convenciones que ya están leídas de `CLAUDE.md`** (resumen; el original manda)
 - La code review va **antes** del merge; el merge no pide confirmación y el push a `main`
@@ -39,37 +35,20 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
 - No hay framework de tests en el repo: las comprobaciones son `npm run build` (tsc + vite),
   `npm run lint` (oxlint) y el recorrido por navegador.
 
-**Análisis del backlog (actualizado 2026-09-13, tras MOO2-172)**
-- **MOO2-172 hecho el 2026-09-13**. No tenía preguntas abiertas y resultó ser de una línea: el
-  único obstáculo era el guard de saldo en `redeemChildPoints`. Aprendizaje reutilizable: **antes
-  de implementar un ticket de "permitir X", comprueba cuántos AC ya se cumplen** — aquí 5 de 8 ya
-  eran ciertos (nada en la app recorta puntos a cero) y el trabajo real fue verificarlos, no
-  escribirlos.
-- Queda en Backlog, sin nadie empezado: **MOO2-103 → MOO2-104** (copias en la nube),
-  **MOO2-168** (puntual desde la lista rápida) y **MOO2-169** (cambio de día). Todos Medium, así
-  que la prioridad no desempata; 103 es con diferencia el más grande y 169 sigue bloqueado por
-  producto.
-- Orden natural de la tanda de copias de seguridad: **MOO2-100 → MOO2-103 → MOO2-104**. El 100
-  (restaurar desde fichero) es el mecanismo que el 104 (restaurar una copia de la nube por fecha)
-  reutiliza; hacerlos al revés es escribir dos veces la parte delicada.
-- **MOO2-100 hecho el 2026-09-13** (PR #28). Sus dos preguntas abiertas las cerró Fernando:
-  restaurar reemplaza el **documento entero**, y el `changeLog` se **fusiona por id** con el de la
-  copia. Eso deja a **MOO2-103 → MOO2-104** como la continuación natural de la tanda de copias de
-  seguridad: el mecanismo de restaurar desde un fichero ya existe y el 104 lo reutiliza.
-- Aviso para el 103/104: la restauración vive en `restoreBackup` (`useFamilyData.ts`) y la
-  validación en `parseBackup` (`padres/backup.ts`); ambas son reutilizables tal cual desde una
-  copia traída de la nube — lo único específico del fichero local es el `<input type=file>` de
-  `RestoreBackupView`.
-- **MOO2-101 cerrado como duplicado** de MOO2-103 + MOO2-104 (autorizado por Fernando el
-  2026-09-12): pedía lo mismo repartido peor.
-- **MOO2-168** (reutilizar una puntual desde la lista rápida) es el hermano de MOO2-167 y queda
-  en Backlog. Toca el formulario de creación y `createMissionsFromTemplates`, que hoy crea
-  siempre misiones recurrentes en el día que se está viendo.
-- **MOO2-169** (que las dos pantallas se enteren del cambio de día) queda en Backlog con "Needs
-  Refinement" y **tres preguntas abiertas de producto** sin responder, la de más peso si un niño/a
-  puede seguir marcando una puntual de ayer. Es continuación de MOO2-167, que ya dejó `today` como
-  estado en el panel de padres; falta `selected` en las dos pantallas y el `todayISODate()` que
-  `ninos/App.tsx` calcula en cada render.
+**En vuelo: MOO2-103** (copias automáticas en la nube), rama
+`feature/moo2-103-automatic-cloud-backups-with-retention`, [PR #33](https://github.com/fernandoclaros-fasttrack/las-misiones-del-huerto/pull/33) en draft.
+- Hecho: implementación, verificación contra el fallback local, code review (2 hallazgos, los
+  dos arreglados y vueltos a verificar). Fase 4 a medias: **falta verificar contra producción**.
+- Bloqueado en: Fernando tiene que **publicar `firestore.rules`** en la consola de Firebase (la
+  colección `backups` es nueva y las reglas vigentes la deniegan). El agente no las publica.
+- Contra producción, sin las reglas, ya se vio que la copia diaria cae en `permission-denied` y
+  se queda en consola. El recorrido por la pantalla de padres de producción lo bloqueó el
+  clasificador de permisos: pídele a Fernando que autorice ese tipo de acción o que lo pruebe él.
+- Al reanudar: comprobar que las reglas están publicadas (la consola avisa de «permisos
+  insuficientes» si no), verificar en producción (copia diaria en `backups`, copia previa a
+  eliminar a un hijo/a `ZZ …` de prueba), y entonces PR a ready, merge y Test AC.
+- Después queda solo **MOO2-104** en el backlog, que reutiliza `restoreBackup`/`parseBackup` y
+  añade la lista de copias de la nube.
 
 **Verificación contra producción: lo que cuesta redescubrir**
 - El `.env.local` **no está en los worktrees**, solo en el checkout principal: hay que copiarlo
