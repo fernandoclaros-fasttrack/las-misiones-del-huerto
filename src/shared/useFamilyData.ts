@@ -4,6 +4,7 @@ import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData, todayISODate } from './constants'
 import { useToday } from './useToday'
+import * as cloudBackup from './cloudBackup'
 import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, Mission, MissionStatus } from './types'
 import * as logic from './logic'
 
@@ -266,6 +267,30 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
   useEffect(() => {
     if (rawRef.current) setData(normalize(rawRef.current))
   }, [today])
+
+  /** Copia diaria en la nube (MOO2-103), en cuanto hay documento leído y otra vez cada vez que
+   *  cambia el día. `dailyBackup` ya decide si toca (una al día, y ninguna si nada ha cambiado
+   *  desde la última), así que aquí basta con llamarla una vez por día. "Al arrancar" no alcanza:
+   *  la tablet de la cocina se abre una vez y se queda abierta días, y con una sola llamada por
+   *  montaje solo tendría la copia del primero. Se hace desde las dos pantallas por lo mismo. */
+  const dailyBackupDay = useRef<string | null>(null)
+  useEffect(() => {
+    if (!enabled) {
+      dailyBackupDay.current = null
+      return
+    }
+    if (dailyBackupDay.current === today || !data || !rawRef.current) return
+    dailyBackupDay.current = today
+    void cloudBackup.dailyBackup(rawRef.current)
+  }, [enabled, data, today])
+
+  /** Copia del documento tal cual está, justo antes de una acción destructiva (MOO2-103). Se copia
+   *  el documento sin normalizar (`rawRef`) porque es lo que de verdad hay guardado. Devuelve si
+   *  se pudo guardar; decidir qué hacer si no es cosa de la pantalla. */
+  const backupBeforeAction = useCallback(async (kind: Exclude<cloudBackup.BackupKind, 'daily'>, description: string) => {
+    if (!rawRef.current) return false
+    return cloudBackup.backupBeforeAction(kind, description, rawRef.current)
+  }, [])
 
   const run = useCallback(async <TResult,>(mutator: Mutator<TResult>): Promise<TResult> => {
     if (firebaseEnabled && firestore) {
@@ -591,5 +616,5 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
     [run, actor],
   )
 
-  return { data, loading, ...actions }
+  return { data, loading, backupBeforeAction, ...actions }
 }

@@ -201,6 +201,10 @@ bloque de aviso, y ahí espera. `Done` lo decide él (o lo cierra él mismo por 
   the moment a mission is first created. `createMissionsFromTemplates` always creates *recurring*
   missions on the day currently being viewed (same default as a normal "Añadir misión"); one-off
   creation from the quick-pick list was out of scope.
+- **Cloud backups** (`backups` collection, MOO2-103): one document per copy, never updated
+  (the rules have no `update`), pruned by the client to 5 daily + 5 "before a destructive
+  action". The daily copy is re-attempted whenever `useToday()` changes, not only on mount,
+  because the kitchen tablet stays open for days.
 
 ## Verifying changes
 
@@ -235,3 +239,11 @@ Push to `main` auto-triggers the GitHub Actions workflow (`.github/workflows/dep
 builds with the Firebase config + `VITE_AUTH_EMAIL` from GitHub Actions secrets and deploys to
 Pages. Adding a new `VITE_*` env var requires: adding it to `.env.example`, `.env.local`, the
 workflow's env block, and as a GitHub secret (`gh secret set`).
+
+**`firestore.rules` does not deploy with the push.** There is no Firebase CLI and no rules step
+in the workflow: Fernando pastes the file into the Firebase console by hand (README step 6). A
+change that needs new rules (a new collection, like `backups` in MOO2-103) therefore cannot be
+verified against production nor merged until he has published them — the app code ships in
+minutes, the rules only when he pastes them, and in between the new feature hits
+`permission-denied`. Publishing the rules is his step, not the agent's: ask for it as early as
+the rules are final, not at the end.

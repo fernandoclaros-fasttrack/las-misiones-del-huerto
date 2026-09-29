@@ -5,7 +5,9 @@ import type { FamilyData } from '../../shared/types'
 
 interface Props {
   current: FamilyData
-  onRestore: (data: FamilyData, exportedAt?: string) => Promise<void>
+  /** Devuelve si se restauró: `false` cuando no se pudo guardar la copia previa y se decidió no
+   *  seguir (MOO2-103). En ese caso no ha cambiado nada y la pantalla se queda donde estaba. */
+  onRestore: (data: FamilyData, exportedAt?: string) => Promise<boolean>
   onDone: (message: string) => void
   onBack: () => void
 }
@@ -54,8 +56,8 @@ export function RestoreBackupView({ current, onRestore, onDone, onBack }: Props)
     if (!backup || restoring) return
     setRestoring(true)
     try {
-      await onRestore(backup.data, backup.exportedAt)
-      onDone('Copia de seguridad restaurada')
+      if (await onRestore(backup.data, backup.exportedAt)) onDone('Copia de seguridad restaurada')
+      else setRestoring(false)
     } catch (err) {
       console.error('No se pudo restaurar la copia de seguridad:', err)
       setError('No se ha podido restaurar la copia. Los datos actuales no se han tocado.')
