@@ -35,20 +35,16 @@ cuentan el PR y el comentario del ticket). Las entradas de tickets que llegan a 
 - No hay framework de tests en el repo: las comprobaciones son `npm run build` (tsc + vite),
   `npm run lint` (oxlint) y el recorrido por navegador.
 
-**En vuelo: MOO2-103** (copias automáticas en la nube), rama
-`feature/moo2-103-automatic-cloud-backups-with-retention`, [PR #33](https://github.com/fernandoclaros-fasttrack/las-misiones-del-huerto/pull/33) en draft.
-- Hecho: implementación, verificación contra el fallback local, code review (2 hallazgos, los
-  dos arreglados y vueltos a verificar). Fase 4 a medias: **falta verificar contra producción**.
-- Bloqueado en: Fernando tiene que **publicar `firestore.rules`** en la consola de Firebase (la
-  colección `backups` es nueva y las reglas vigentes la deniegan). El agente no las publica.
-- Contra producción, sin las reglas, ya se vio que la copia diaria cae en `permission-denied` y
-  se queda en consola. El recorrido por la pantalla de padres de producción lo bloqueó el
-  clasificador de permisos: pídele a Fernando que autorice ese tipo de acción o que lo pruebe él.
-- Al reanudar: comprobar que las reglas están publicadas (la consola avisa de «permisos
-  insuficientes» si no), verificar en producción (copia diaria en `backups`, copia previa a
-  eliminar a un hijo/a `ZZ …` de prueba), y entonces PR a ready, merge y Test AC.
-- Después queda solo **MOO2-104** en el backlog, que reutiliza `restoreBackup`/`parseBackup` y
-  añade la lista de copias de la nube.
+**Backlog (2026-09-29, tras MOO2-103)**
+- Queda solo **MOO2-104** (lista de copias de la nube y restaurar una por fecha). Reutiliza
+  `restoreBackup` (`useFamilyData.ts`) y `parseBackup` (`padres/backup.ts`); las copias viven en
+  la colección `backups` (`src/shared/cloudBackup.ts`), con `kind`, `description` y `takenAt`
+  (Timestamp del servidor) listos para pintar la lista. Restaurar desde ahí debe pasar por
+  `withSafetyBackup` (`padres/App.tsx`), igual que desde un fichero.
+- Leer las copias desde la consola del navegador en dev: importar `/src/shared/firebase.ts` y el
+  módulo de Firestore **con la misma URL que usa la app** (`/node_modules/.vite/deps/firebase_firestore.js?v=<hash>`,
+  se ve en el fuente servido de `cloudBackup.ts`); sin el `?v=` es otra instancia y
+  `collection()` rechaza la base de datos.
 
 **Verificación contra producción: lo que cuesta redescubrir**
 - El `.env.local` **no está en los worktrees**, solo en el checkout principal: hay que copiarlo
