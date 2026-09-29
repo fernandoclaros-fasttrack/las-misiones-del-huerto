@@ -268,20 +268,21 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
     if (rawRef.current) setData(normalize(rawRef.current))
   }, [today])
 
-  /** Copia diaria en la nube (MOO2-103), una vez por montaje y en cuanto hay documento leído.
-   *  `dailyBackup` ya decide si toca (una al día, y ninguna si nada ha cambiado desde la última),
-   *  así que esto solo tiene que llamarla una vez. Se hace desde las dos pantallas: "al arrancar la
-   *  app" incluye la tablet de los niños, que es la que se abre todos los días. */
-  const dailyBackupDone = useRef(false)
+  /** Copia diaria en la nube (MOO2-103), en cuanto hay documento leído y otra vez cada vez que
+   *  cambia el día. `dailyBackup` ya decide si toca (una al día, y ninguna si nada ha cambiado
+   *  desde la última), así que aquí basta con llamarla una vez por día. "Al arrancar" no alcanza:
+   *  la tablet de la cocina se abre una vez y se queda abierta días, y con una sola llamada por
+   *  montaje solo tendría la copia del primero. Se hace desde las dos pantallas por lo mismo. */
+  const dailyBackupDay = useRef<string | null>(null)
   useEffect(() => {
     if (!enabled) {
-      dailyBackupDone.current = false
+      dailyBackupDay.current = null
       return
     }
-    if (dailyBackupDone.current || !data || !rawRef.current) return
-    dailyBackupDone.current = true
+    if (dailyBackupDay.current === today || !data || !rawRef.current) return
+    dailyBackupDay.current = today
     void cloudBackup.dailyBackup(rawRef.current)
-  }, [enabled, data])
+  }, [enabled, data, today])
 
   /** Copia del documento tal cual está, justo antes de una acción destructiva (MOO2-103). Se copia
    *  el documento sin normalizar (`rawRef`) porque es lo que de verdad hay guardado. Devuelve si

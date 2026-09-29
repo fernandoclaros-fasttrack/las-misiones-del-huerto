@@ -158,6 +158,9 @@ export default function App() {
   /** Pregunta pendiente de "¿seguir sin copia?" (MOO2-103). Guarda el `resolve` de la promesa que
    *  espera la respuesta, para que la acción protegida pueda simplemente `await` la decisión. */
   const [noBackup, setNoBackup] = useState<{ action: string; resolve: (go: boolean) => void } | null>(null)
+  /** El `resolve` del aviso abierto, fuera del estado porque `withSafetyBackup` lo lee desde el
+   *  closure de un render anterior. */
+  const noBackupResolveRef = useRef<((go: boolean) => void) | null>(null)
 
   /** Ejecuta una acción destructiva con su copia previa en la nube (MOO2-103): resetear la semana,
    *  eliminar a un hijo/a y restaurar otra copia. Si la copia no se puede guardar, la acción no se
@@ -166,8 +169,22 @@ export default function App() {
   async function withSafetyBackup(kind: 'reset' | 'removeChild' | 'restore', action: string, description: string, run: () => Promise<unknown>): Promise<boolean> {
     const saved = await backupBeforeAction(kind, description)
     if (!saved) {
-      const go = await new Promise<boolean>((resolve) => setNoBackup({ action, resolve }))
-      setNoBackup(null)
+      // Si ya había otra pregunta abierta (dos fallos seguidos), esa se da por cancelada: dejarla
+      // sin responder colgaría su acción para siempre, y en restaurar dejaría la pantalla en
+      // "Restaurando…".
+      noBackupResolveRef.current?.(false)
+      let mine: ((go: boolean) => void) | null = null
+      const go = await new Promise<boolean>((resolve) => {
+        mine = resolve
+        noBackupResolveRef.current = resolve
+        setNoBackup({ action, resolve })
+      })
+      // Solo se cierra el aviso si sigue siendo el de esta acción; si lo ha sustituido otro, ese
+      // sigue abierto esperando su respuesta.
+      if (noBackupResolveRef.current === mine) {
+        noBackupResolveRef.current = null
+        setNoBackup(null)
+      }
       if (!go) return false
     }
     await run()
