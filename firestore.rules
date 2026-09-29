@@ -10,5 +10,22 @@ service cloud.firestore {
     match /families/default {
       allow read, write: if request.auth != null;
     }
+
+    // Copias automáticas (MOO2-103). La misma cuenta que puede leer el documento de la familia
+    // puede leerlas, pero protegen más que él: una copia no se reescribe nunca (no hay `update`),
+    // así que un fallo de la app no puede estropear la copia que haría falta para arreglarlo. Borrar
+    // sí se permite, porque la poda de las más antiguas (cinco por cupo) la hace el propio cliente
+    // — no hay backend en el plan gratuito — y ninguna pantalla ofrece borrarlas a mano.
+    match /backups/{backupId} {
+      allow read, delete: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['app', 'kind', 'description', 'dataHash', 'data', 'takenAt'])
+        && request.resource.data.app == 'las-misiones-del-huerto'
+        && request.resource.data.kind in ['daily', 'reset', 'removeChild', 'restore']
+        // La hora la pone el servidor, no la tablet: el orden de las copias no puede depender de
+        // un reloj mal puesto.
+        && request.resource.data.takenAt == request.time
+        && request.resource.data.data is map;
+    }
   }
 }

@@ -4,6 +4,7 @@ import { FAMILY_DOC_PATH, firebaseEnabled, firestore } from './firebase'
 import { localStore } from './localStore'
 import { seedFamilyData, todayISODate } from './constants'
 import { useToday } from './useToday'
+import * as cloudBackup from './cloudBackup'
 import type { ChangeActor, ChangeLogEntry, Child, ChildPointsDelta, FamilyData, Mission, MissionStatus } from './types'
 import * as logic from './logic'
 
@@ -266,6 +267,29 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
   useEffect(() => {
     if (rawRef.current) setData(normalize(rawRef.current))
   }, [today])
+
+  /** Copia diaria en la nube (MOO2-103), una vez por montaje y en cuanto hay documento leído.
+   *  `dailyBackup` ya decide si toca (una al día, y ninguna si nada ha cambiado desde la última),
+   *  así que esto solo tiene que llamarla una vez. Se hace desde las dos pantallas: "al arrancar la
+   *  app" incluye la tablet de los niños, que es la que se abre todos los días. */
+  const dailyBackupDone = useRef(false)
+  useEffect(() => {
+    if (!enabled) {
+      dailyBackupDone.current = false
+      return
+    }
+    if (dailyBackupDone.current || !data || !rawRef.current) return
+    dailyBackupDone.current = true
+    void cloudBackup.dailyBackup(rawRef.current)
+  }, [enabled, data])
+
+  /** Copia del documento tal cual está, justo antes de una acción destructiva (MOO2-103). Se copia
+   *  el documento sin normalizar (`rawRef`) porque es lo que de verdad hay guardado. Devuelve si
+   *  se pudo guardar; decidir qué hacer si no es cosa de la pantalla. */
+  const backupBeforeAction = useCallback(async (kind: Exclude<cloudBackup.BackupKind, 'daily'>, description: string) => {
+    if (!rawRef.current) return false
+    return cloudBackup.backupBeforeAction(kind, description, rawRef.current)
+  }, [])
 
   const run = useCallback(async <TResult,>(mutator: Mutator<TResult>): Promise<TResult> => {
     if (firebaseEnabled && firestore) {
@@ -591,5 +615,5 @@ export function useFamilyData(actor: ChangeActor, enabled: boolean) {
     [run, actor],
   )
 
-  return { data, loading, ...actions }
+  return { data, loading, backupBeforeAction, ...actions }
 }

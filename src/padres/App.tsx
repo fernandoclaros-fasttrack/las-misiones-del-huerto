@@ -14,6 +14,7 @@ import { MissionTemplatesQuickPick } from './components/MissionTemplatesQuickPic
 import { SettingsMenu } from './components/SettingsMenu'
 import { ChangeHistoryView } from './components/ChangeHistoryView'
 import { RestoreBackupView } from './components/RestoreBackupView'
+import { NoBackupConfirm } from './components/NoBackupConfirm'
 import { GlobalMissionsView } from './components/GlobalMissionsView'
 import { downloadBackup } from './backup'
 import { sortedMissions, sortedMissionSeries, byTitle, isMissionCurrentForParents, oneOffDateLabel } from '../shared/logic'
@@ -67,6 +68,7 @@ export default function App() {
     editMissionTemplate,
     deleteMissionTemplate,
     restoreBackup,
+    backupBeforeAction,
   } = useFamilyData('padre', isAuthed)
 
   const [showHistory, setShowHistory] = useState(false)
@@ -151,6 +153,25 @@ export default function App() {
     setToast(message)
     if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current)
     toastTimerRef.current = window.setTimeout(() => setToast(null), 2200)
+  }
+
+  /** Pregunta pendiente de "¿seguir sin copia?" (MOO2-103). Guarda el `resolve` de la promesa que
+   *  espera la respuesta, para que la acción protegida pueda simplemente `await` la decisión. */
+  const [noBackup, setNoBackup] = useState<{ action: string; resolve: (go: boolean) => void } | null>(null)
+
+  /** Ejecuta una acción destructiva con su copia previa en la nube (MOO2-103): resetear la semana,
+   *  eliminar a un hijo/a y restaurar otra copia. Si la copia no se puede guardar, la acción no se
+   *  bloquea sin más ni sigue a ciegas: se avisa y decide el padre/madre. Devuelve si la acción
+   *  llegó a ejecutarse, para que quien llama sepa si se abandonó. */
+  async function withSafetyBackup(kind: 'reset' | 'removeChild' | 'restore', action: string, description: string, run: () => Promise<unknown>): Promise<boolean> {
+    const saved = await backupBeforeAction(kind, description)
+    if (!saved) {
+      const go = await new Promise<boolean>((resolve) => setNoBackup({ action, resolve }))
+      setNoBackup(null)
+      if (!go) return false
+    }
+    await run()
+    return true
   }
 
   if (!ready) {
@@ -477,6 +498,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', background: '#E9E0CC', fontFamily: "'Nunito', system-ui, sans-serif", color: '#3A3228', display: 'flex', justifyContent: 'center' }}>
       <Toast message={toast} />
+      {noBackup && <NoBackupConfirm action={noBackup.action} onConfirm={() => noBackup.resolve(true)} onCancel={() => noBackup.resolve(false)} />}
       <div style={{ width: '100%', maxWidth: 520, display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
         <header style={{ background: ACCENT, color: '#F6F1E2', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
@@ -487,7 +509,7 @@ export default function App() {
             onBackup={() => downloadBackup(data)}
             onRestore={() => setShowRestore(true)}
             onHistory={() => setShowHistory(true)}
-            onReset={() => void resetCounter()}
+            onReset={() => void withSafetyBackup('reset', 'resetear la semana', 'Antes de resetear la semana', resetCounter)}
             onLogout={() => void logout()}
           />
         </header>
@@ -495,7 +517,9 @@ export default function App() {
         {showRestore ? (
           <RestoreBackupView
             current={data}
-            onRestore={restoreBackup}
+            onRestore={(backup, exportedAt) =>
+              withSafetyBackup('restore', 'restaurar otra copia', 'Antes de restaurar una copia', () => restoreBackup(backup, exportedAt))
+            }
             onDone={(message) => {
               setShowRestore(false)
               showToast(message)
@@ -531,7 +555,10 @@ export default function App() {
                 adjustments={data.adjustments}
                 onAdd={(name) => void addChild(name)}
                 onRename={(id, name) => void renameChild(id, name)}
-                onRemove={(id) => void removeChild(id)}
+                onRemove={(id) => {
+                  const name = data.children.find((c) => c.id === id)?.name ?? 'un hijo/a'
+                  void withSafetyBackup('removeChild', `eliminar a ${name}`, `Antes de eliminar a ${name}`, () => removeChild(id))
+                }}
                 onEditPoints={(id, value) => void editChildPoints(id, value)}
                 onAdjust={(id, points, reason) => adjustChildPoints(id, points, reason)}
                 onRedeem={(id, points, concept) => redeemChildPoints(id, points, concept)}
